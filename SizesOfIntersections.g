@@ -1,8 +1,8 @@
 N_LETTERS := 20;
 G := SymmetricGroup(N_LETTERS);
 CONJUGATION_ACTION := OnPoints; 
-NUM_TRIALS := 10000;
-NUM_PAIRS := 2;
+NUM_TRIALS := 50000;
+NUM_PAIRS := 3;
 
 FindAllConjugators := function(G, g, h)
     local centralizer, r;
@@ -37,3 +37,4 @@ for trial in [1..NUM_TRIALS] do
     fi;
 od;
 PrintTo("./.output", lengths);
+quit;

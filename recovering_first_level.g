@@ -1,75 +1,42 @@
 LoadPackage("AutomGrp");
-#Read( Filename( DirectoriesPackageLibrary( "automgrp", "tst" ), "testall.g"));
 
 N_LETTERS := 4; # was 4
-G := SymmetricGroup(N_LETTERS);
+SD := SymmetricGroup(N_LETTERS);
+G := AutomatonGroup("a=(1,1)(1,2),b=(a,c),c=(a,d),d=(1,b)"); #Grigorchuk group
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
 FindAllConjugators := function(G, g, h)
     local centralizer, r;
 
     centralizer := Centralizer(G, g); # centralizer of g
-    r := RepresentativeAction(G, g, h, CONJUGATION_ACTION); # 
+    r := RepresentativeAction(G, g, h, CONJUGATION_ACTION);
     return RightCoset(centralizer, r);
 end;
 
-printMe := function()
-    local conjugacyClasses, conjugacyClass, g, h;
+IntersectionOfTuples := function(g_t, h_t)
+    local ghConjugators, allConj, intersect, i;
 
-    conjugacyClasses := ConjugacyClasses(G);
-    for conjugacyClass in conjugacyClasses do
-        for g in Elements(conjugacyClass) do 
-            for h in Elements(conjugacyClass) do 
-                Print("g: ", g, "\nh: ", h, "\nPossible conjugators: ", FindAllConjugators(G, g, h), "\n\n");
-            od;
-            Print("\n------------------------------------------------------------\n");
-        od;
-        Print("\n*************************************************************\n*************************************************************\n");
-    od;
-end;
-
-Print("\n\n******************************************************************************************\n");
-Print("\t\t\t\tTUPLES OF Gs & Hs");
-Print("\n******************************************************************************************\n\n");
-
-IntersectionOfTuples := function(g_t, h_t, s_what)
-    # s_what: which symmetric group number you want
-
-    local G, gTuple, hTuple, ghConjugators, allConj, intersect, i;
-
-    G := SymmetricGroup(s_what);
     # getting tuples of g and h values
-    gTuple := [];
-    Append(gTuple, g_t);
-    hTuple := [];
-    Append(hTuple, h_t);
-    ghConjugators := [];
+    ghConjugators := FindAllConjugators(g_t[1], h_t[1]);
 
-    for i in [1..Length(g_t)] do
+    for i in [2..Length(g_t)] do
         # all conjugators of a g/h pair
-        allConj := FindAllConjugators(G,gTuple[i],hTuple[i]);
-        Append(ghConjugators, [Elements(allConj)]);
-        Print("g: ", gTuple[i], " h: ", hTuple[i], " all reps: ", ghConjugators[i], "\n");
-        Print("\n------------------------------------------------------------\n");
+        allConj := FindAllConjugators(G, g_t[i], h_t[i]);
+        ghConjugators := Intersection(ghConjugators, allConj);
     od;
-
-    # finding the intersection of the tuples
-    intersect := ghConjugators[1];
-
-    for i in [1..Length(ghConjugators)] do
-        intersect := Intersection(intersect, ghConjugators[i]);
-    od;
-
-    Print("\nIntersection of conjugators: ", intersect);
-    return intersect;
+    return ghConjugators;
 end;
 
 #Modified from 2024 group
-AreNotConjugateOnLevel:=function(a, b, level)
-    if not IsConjugate(PermGroupOnLevel(G, level), PermOnLevel(a, level), PermOnLevel(b, level)) then
-        # Return true if NOT conjugate 
-        return true; 
-    fi;
+AreNotConjugateOnLevel:=function(a, b, max_level)
+    local perm_group, level;
+    for level in [1..max_level] do
+         perm_group := PermGroupOnLevel(G, level);
+        if not IsConjugate(PermGroupOnLevel(G, level), PermOnLevel(a, level), PermOnLevel(b, level)) then
+            # Return true if NOT conjugate 
+            return true; 
+        fi;
+    od;
     return false;
 end;
 
@@ -83,7 +50,7 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r)
     orbits := Orbits(Group(sigma_g));
     sizesWithMultipleCycles := [];
     for size in [1..Length(cycle_structure)] do
-        if cycle_structure[size] > 1 then 
+        if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
             #cycle_structure[1] is number of cycles of length 2
             Append(sizesWithMultipleCycles, [size + 1]);
         fi;
@@ -120,21 +87,30 @@ end;
 
 
 # THE ACTUAL PROCESS
-recoveringL1 := function(sigma_g, sigma_h, s_what)
-    local possibleRs;
+recoveringL1 := function(g_t, h_t)
+    local possibleRs, sigma_gs, sigma_hs, i;
+    sigma_gs := List(g_t, g -> PermOnLevel(g, 1));
+    sigma_hs := List(h_t, h -> PermOnLevel(h, 1));
 
-    possibleRs := IntersectionOfTuples(sigma_g, sigma_h, s_what);
+    #Get possible sigma_r by looking at elements of SD that could conjugate all sigma_g/sigma_h pairs
+    possibleRs := IntersectionOfTuples(sigma_gs, sigma_hs);
 
     if Length(possibleRs) = 1 then
         Print("\n\n\n**********************************************************************\n");
         Print("Sigma_r is equal to ", possibleRs[1]);
         Print("\n**********************************************************************\n\n\n");
+        return possibleRs[1];
     else
         Print("\n\nTrying to narrow down ", possibleRs, "...\n");
-        # fahran's method goes here
-        possibleRs := TestConjugacyRelationships(sigma_g, sigma_h, possibleRs);
+        #Narrow down possibilities for sigma_r by looking at conjugacy relationships between sections
+        i := 1;
+        while i <= Length(g_t) and Length(possibleRs) > 1 do
+            if Maximum(CycleStructurePerm(sigma_gs[i])) > 1 then 
+                possibleRs := TestConjugacyRelationships(g_t[i], h_t[i], possibleRs);
+            fi;
+            i := i + 1;
+        od;
         Print("\nPossible sigma_rs: ", possibleRs);
+        return possibleRs[1];
     fi;
 end;
-
-recoveringL1([(1,3,2),(1,2,3)], [(1,2,3),(1,3,2)],4);

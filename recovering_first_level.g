@@ -2,9 +2,10 @@ LoadPackage("AutomGrp");
 
 N_LETTERS := 6; 
 SD := SymmetricGroup(N_LETTERS);
-G := AutomatonGroup("g1 = (1, 1, 1, 1)(1, 3)(2, 4), h1 = (1, 1, 1, 1)(1, 2)(3, 4)");
+G := AutomatonGroup("a=(1,1,1,1,1,1)(1,2), b=(a,a,1,b,b,b), c=(a,1,a,c,c,c), d=(1,a,a,d,d,d)"); #universal grigorchuk group
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
+#Example we have tried: g_1 = b, g_2 = dac, r = abaca
 FindAllConjugators := function(G, g, h)
     local centralizer, r;
 
@@ -45,7 +46,7 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r)
     fixed_points, size, orbits_of_size, valid_sigma_r, sigma_r, valid, 
     orbit, lhs, rhs, current_index, section;
 
-    Print("Hello world");
+    Print("---------\nTesting relationships between g = ", Sections(g, 1), PermOnLevel(g, 1), " and h = ", Sections(h, 1), PermOnLevel(h, 1), "\n----------\n");
 
     sigma_g := PermOnLevel(g, 1);
     cycle_structure := CycleStructurePerm(sigma_g);
@@ -104,7 +105,7 @@ end;
 
 # THE ACTUAL PROCESS
 recoveringL1 := function(g_t, h_t)
-    local possibleRs, sigma_gs, sigma_hs, i;
+    local possibleRs, sigma_gs, sigma_hs, i, sigma_g, fixed_points;
     sigma_gs := List(g_t, g -> PermOnLevel(g, 1));
     sigma_hs := List(h_t, h -> PermOnLevel(h, 1));
 
@@ -121,8 +122,12 @@ recoveringL1 := function(g_t, h_t)
         #Narrow down possibilities for sigma_r by looking at conjugacy relationships between sections
         i := 1;
         while i <= Length(g_t) and Length(possibleRs) > 1 do
-            #First condition is for if sigma_gs[i] is trivial permutation
-            if Length(CycleStructurePerm(sigma_gs[i])) = 0 or Maximum(CycleStructurePerm(sigma_gs[i])) > 1 then 
+            sigma_g := sigma_gs[i];            
+            fixed_points := [1..N_LETTERS];
+                if not IsOne(sigma_g) then
+                    SubtractSet(fixed_points, MovedPoints(sigma_g));
+                fi;
+            if fixed_points > 1 or Maximum(CycleStructurePerm(sigma_gs)) > 1 then 
                 possibleRs := TestConjugacyRelationships(g_t[i], h_t[i], possibleRs);
             fi;
             i := i + 1;

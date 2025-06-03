@@ -26,7 +26,7 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r)
     orbits := Orbits(Group(sigma_g));
     sizesWithMultipleCycles := [];
     for size in [1..Length(cycle_structure)] do
-        if cycle_structure[size] > 1 then 
+        if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
             #cycle_structure[1] is number of cycles of length 2
             Append(sizesWithMultipleCycles, [size + 1]);
         fi;

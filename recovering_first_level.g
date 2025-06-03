@@ -5,7 +5,9 @@ SD := SymmetricGroup(N_LETTERS);
 G := AutomatonGroup("a=(1,1,1,1,1,1)(1,2), b=(a,a,1,b,b,b), c=(a,1,a,c,c,c), d=(1,a,a,d,d,d)"); #universal grigorchuk group
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
-#Example we have tried: g_1 = b, g_2 = dac, r = abaca
+#Examples we have tried: 
+    #g_1 = b, g_2 = dac, r = abaca
+    #g_1 = a, g_2 = abac, g_3 = da, g_4 = cabad, r = abadacada
 FindAllConjugators := function(G, g, h)
     local centralizer, r;
 
@@ -18,11 +20,11 @@ IntersectionOfTuples := function(g_t, h_t)
     local ghConjugators, allConj, intersect, i;
 
     # getting tuples of g and h values
-    ghConjugators := FindAllConjugators(SD, g_t[1], h_t[1]);
+    ghConjugators := FindAllConjugators(PermGroupOnLevel(G, 1), g_t[1], h_t[1]);
 
     for i in [2..Length(g_t)] do
         # all conjugators of a g/h pair
-        allConj := FindAllConjugators(SD, g_t[i], h_t[i]);
+        allConj := FindAllConjugators(PermGroupOnLevel(G, 1), g_t[i], h_t[i]);
         ghConjugators := Intersection(ghConjugators, allConj);
     od;
     return ghConjugators;

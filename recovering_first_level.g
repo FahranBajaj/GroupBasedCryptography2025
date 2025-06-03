@@ -6,8 +6,9 @@ G := AutomatonGroup("a=(1,1,1,1,1,1)(1,2), b=(a,a,1,b,b,b), c=(a,1,a,c,c,c), d=(
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
 #Examples we have tried: 
-    #g_1 = b, g_2 = dac, r = abaca
-    #g_1 = a, g_2 = abac, g_3 = da, g_4 = cabad, r = abadacada
+    #g_1 = b, g_2 = dac, r = abaca: FAIL
+    #g_1 = b, g_2 = dac, r = aba: FAIL
+    #g_1 = a, g_2 = abac, g_3 = da, g_4 = cabad, r = abadacada: SUCCESS
 FindAllConjugators := function(G, g, h)
     local centralizer, r;
 

@@ -2,7 +2,7 @@ LoadPackage("AutomGrp");
 
 N_LETTERS := 4; # was 4
 SD := SymmetricGroup(N_LETTERS);
-G := AutomatonGroup("g = (1, 1, 1, 1)(1, 3)(2, 4), h = (1, 1, 1, 1)(1, 2)(3, 4)"); #Grigorchuk group
+G := AutomatonGroup("g1 = (1, 1, 1, 1)(1, 3)(2, 4), h1 = (1, 1, 1, 1)(1, 2)(3, 4)");
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
 FindAllConjugators := function(G, g, h)
@@ -21,7 +21,7 @@ IntersectionOfTuples := function(g_t, h_t)
 
     for i in [2..Length(g_t)] do
         # all conjugators of a g/h pair
-        allConj := FindAllConjugators(G, g_t[i], h_t[i]);
+        allConj := FindAllConjugators(SD, g_t[i], h_t[i]);
         ghConjugators := Intersection(ghConjugators, allConj);
     od;
     return ghConjugators;

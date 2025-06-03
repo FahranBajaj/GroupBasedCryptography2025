@@ -4,11 +4,15 @@ D := 2
 SD := SymmetricGroup(D);
 
 #Modified from 2024 group
-AreNotConjugateOnLevel:=function(a, b, level)
-    if not IsConjugate(PermGroupOnLevel(G, level), PermOnLevel(a, level), PermOnLevel(b, level)) then
-        # Return true if NOT conjugate 
-        return true; 
-    fi;
+AreNotConjugateOnLevel:=function(a, b, max_level)
+    local perm_group, level;
+    for level in [1..max_level] do
+         perm_group := PermGroupOnLevel(G, level);
+        if not IsConjugate(PermGroupOnLevel(G, level), PermOnLevel(a, level), PermOnLevel(b, level)) then
+            # Return true if NOT conjugate 
+            return true; 
+        fi;
+    od;
     return false;
 end;
 

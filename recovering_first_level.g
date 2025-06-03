@@ -2,12 +2,12 @@ LoadPackage("AutomGrp");
 
 N_LETTERS := 6; 
 SD := SymmetricGroup(N_LETTERS);
-G := AutomatonGroup("a=(1,1,1,1,1,1)(1,2), b=(a,a,1,b,b,b), c=(a,1,a,c,c,c), d=(1,a,a,d,d,d)"); #universal grigorchuk group
+G := AutomatonGroup("a=(1,1,1,1,1,1)(1,4)(2,5)(3,6), b=(a,a,1,b,b,b), c=(a,1,a,c,c,c), d=(1,a,a,d,d,d)"); #universal grigorchuk group
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
 #Examples we have tried: 
-    #g_1 = b, g_2 = dac, r = abaca: FAIL
-    #g_1 = b, g_2 = dac, r = aba: FAIL
+    #g_1 = b, g_2 = dac, r = abaca: SUCCESS
+    #g_1 = b, g_2 = dac, r = aba: SUCCESS
     #g_1 = a, g_2 = abac, g_3 = da, g_4 = cabad, r = abadacada: SUCCESS
 FindAllConjugators := function(G, g, h)
     local centralizer, r;

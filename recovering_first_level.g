@@ -1,6 +1,6 @@
 LoadPackage("AutomGrp");
 
-N_LETTERS := 4; # was 4
+N_LETTERS := 6; 
 SD := SymmetricGroup(N_LETTERS);
 G := AutomatonGroup("g1 = (1, 1, 1, 1)(1, 3)(2, 4), h1 = (1, 1, 1, 1)(1, 2)(3, 4)");
 CONJUGATION_ACTION := OnPoints; # action is conjugation
@@ -42,13 +42,22 @@ end;
 
 TestConjugacyRelationships := function(g, h, candidate_sigma_r)
     local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, 
-    size, orbitsOfSize, valid_sigma_r, sigma_r, valid, orbit, lhs, rhs, 
-    current_index, section;
+    fixed_points, size, orbits_of_size, valid_sigma_r, sigma_r, valid, 
+    orbit, lhs, rhs, current_index, section;
+
+    Print("Hello world");
 
     sigma_g := PermOnLevel(g, 1);
     cycle_structure := CycleStructurePerm(sigma_g);
     orbits := Orbits(Group(sigma_g));
     sizesWithMultipleCycles := [];
+    fixed_points := [1..N_LETTERS];
+    if not IsOne(sigma_g) then
+        SubtractSet(fixed_points, MovedPoints(sigma_g));
+    fi;
+    if Length(fixed_points) > 1 then 
+        Append(sizesWithMultipleCycles, [1]);
+    fi;
     for size in [1..Length(cycle_structure)] do
         if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
             #cycle_structure[1] is number of cycles of length 2
@@ -57,18 +66,25 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r)
     od;
     valid_sigma_r := [];
     for sigma_r in candidate_sigma_r do
+        Print("Candidate: ", sigma_r, "\n");
         valid := true;
         for size in sizesWithMultipleCycles do
-            orbitsOfSize := Filtered(orbits, orbit -> Length(orbit) = size);
-            for orbit in orbitsOfSize do
+            if size = 1 then 
+                orbits_of_size := List(fixed_points, pt -> [pt]);
+            else 
+                orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
+            fi;
+            for orbit in orbits_of_size do
                 #g_{a_1}g_{a_2}...g_{a_n} ~ h_{b_1}h_{b_2}...h_{b_n}
                 lhs := One(G); #identity
                 rhs := One(G);
                 current_index := orbit[1];
-                for section in [1..size - 1] do 
+                for section in [1..size] do 
                     lhs := lhs * Section(g, current_index);
-                    rhs := rhs * Section(g, current_index^sigma_r);
+                    rhs := rhs * Section(h, current_index^sigma_r);
+                    current_index := current_index^sigma_g;
                 od;
+                Print("Testing conjugacy relationship: ", lhs, " ~ ", rhs, "\n");
                 if AreNotConjugateOnLevel(lhs, rhs, 4) then
                      valid := false;
                      break;
@@ -105,7 +121,8 @@ recoveringL1 := function(g_t, h_t)
         #Narrow down possibilities for sigma_r by looking at conjugacy relationships between sections
         i := 1;
         while i <= Length(g_t) and Length(possibleRs) > 1 do
-            if Maximum(CycleStructurePerm(sigma_gs[i])) > 1 then 
+            #First condition is for if sigma_gs[i] is trivial permutation
+            if Length(CycleStructurePerm(sigma_gs[i])) = 0 or Maximum(CycleStructurePerm(sigma_gs[i])) > 1 then 
                 possibleRs := TestConjugacyRelationships(g_t[i], h_t[i], possibleRs);
             fi;
             i := i + 1;

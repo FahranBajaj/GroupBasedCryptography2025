@@ -10,7 +10,7 @@ FindAllConjugators := function(G, g, h)
 
     centralizer := Centralizer(G, g); # centralizer of g
     r := RepresentativeAction(G, g, h, CONJUGATION_ACTION);
-    return RightCoset(centralizer, r);
+    return List(RightCoset(centralizer, r));
 end;
 
 IntersectionOfTuples := function(g_t, h_t)

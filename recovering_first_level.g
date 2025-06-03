@@ -2,7 +2,7 @@ LoadPackage("AutomGrp");
 
 N_LETTERS := 4; # was 4
 SD := SymmetricGroup(N_LETTERS);
-G := AutomatonGroup("a=(1,1)(1,2),b=(a,c),c=(a,d),d=(1,b)"); #Grigorchuk group
+G := AutomatonGroup("g = (1, 1, 1, 1)(1, 3)(2, 4), h = (1, 1, 1, 1)(1, 2)(3, 4)"); #Grigorchuk group
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
 FindAllConjugators := function(G, g, h)
@@ -17,7 +17,7 @@ IntersectionOfTuples := function(g_t, h_t)
     local ghConjugators, allConj, intersect, i;
 
     # getting tuples of g and h values
-    ghConjugators := FindAllConjugators(g_t[1], h_t[1]);
+    ghConjugators := FindAllConjugators(SD, g_t[1], h_t[1]);
 
     for i in [2..Length(g_t)] do
         # all conjugators of a g/h pair
@@ -62,8 +62,8 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r)
             orbitsOfSize := Filtered(orbits, orbit -> Length(orbit) = size);
             for orbit in orbitsOfSize do
                 #g_{a_1}g_{a_2}...g_{a_n} ~ h_{b_1}h_{b_2}...h_{b_n}
-                lhs := (1); #identity
-                rhs := (1);
+                lhs := One(G); #identity
+                rhs := One(G);
                 current_index := orbit[1];
                 for section in [1..size - 1] do 
                     lhs := lhs * Section(g, current_index);
@@ -111,6 +111,11 @@ recoveringL1 := function(g_t, h_t)
             i := i + 1;
         od;
         Print("\nPossible sigma_rs: ", possibleRs);
-        return possibleRs[1];
+        if Length(possibleRs) = 1 then 
+            return possibleRs[1];
+        else
+            return fail;
+        fi;
+
     fi;
 end;

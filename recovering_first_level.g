@@ -1,14 +1,9 @@
 LoadPackage("AutomGrp");
 
 N_LETTERS := 6; 
-SD := SymmetricGroup(N_LETTERS);
 G := AutomatonGroup("a=(1,1,1,1,1,1)(1,4)(2,5)(3,6), b=(a,a,1,b,b,b), c=(a,1,a,c,c,c), d=(1,a,a,d,d,d)"); #universal grigorchuk group
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
-#Examples we have tried: 
-    #g_1 = b, g_2 = dac, r = abaca: SUCCESS
-    #g_1 = b, g_2 = dac, r = aba: SUCCESS
-    #g_1 = a, g_2 = abac, g_3 = da, g_4 = cabad, r = abadacada: SUCCESS
 FindAllConjugators := function(G, g, h)
     local centralizer, r;
 
@@ -48,13 +43,10 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r)
     local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, 
     fixed_points, size, orbits_of_size, valid_sigma_r, sigma_r, valid, 
     orbit, lhs, rhs, current_index, section;
-
-    Print("---------\nTesting relationships between g = ", Sections(g, 1), PermOnLevel(g, 1), " and h = ", Sections(h, 1), PermOnLevel(h, 1), "\n----------\n");
-
     sigma_g := PermOnLevel(g, 1);
     cycle_structure := CycleStructurePerm(sigma_g);
     orbits := Orbits(Group(sigma_g));
-    sizesWithMultipleCycles := [];
+    sizesWithMultipleCycles := []; 
     fixed_points := [1..N_LETTERS];
     if not IsOne(sigma_g) then
         SubtractSet(fixed_points, MovedPoints(sigma_g));
@@ -70,7 +62,6 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r)
     od;
     valid_sigma_r := [];
     for sigma_r in candidate_sigma_r do
-        Print("Candidate: ", sigma_r, "\n");
         valid := true;
         for size in sizesWithMultipleCycles do
             if size = 1 then 
@@ -88,7 +79,6 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r)
                     rhs := rhs * Section(h, current_index^sigma_r);
                     current_index := current_index^sigma_g;
                 od;
-                Print("Testing conjugacy relationship: ", lhs, " ~ ", rhs, "\n");
                 if AreNotConjugateOnLevel(lhs, rhs, 4) then
                      valid := false;
                      break;
@@ -112,16 +102,12 @@ recoveringL1 := function(g_t, h_t)
     sigma_gs := List(g_t, g -> PermOnLevel(g, 1));
     sigma_hs := List(h_t, h -> PermOnLevel(h, 1));
 
-    #Get possible sigma_r by looking at elements of SD that could conjugate all sigma_g/sigma_h pairs
+    #Get possible sigma_r by looking at permutations that could conjugate all sigma_g/sigma_h pairs
     possibleRs := IntersectionOfTuples(sigma_gs, sigma_hs);
 
     if Length(possibleRs) = 1 then
-        Print("\n\n\n**********************************************************************\n");
-        Print("Sigma_r is equal to ", possibleRs[1]);
-        Print("\n**********************************************************************\n\n\n");
         return possibleRs[1];
     else
-        Print("\n\nTrying to narrow down ", possibleRs, "...\n");
         #Narrow down possibilities for sigma_r by looking at conjugacy relationships between sections
         i := 1;
         while i <= Length(g_t) and Length(possibleRs) > 1 do
@@ -135,7 +121,6 @@ recoveringL1 := function(g_t, h_t)
             fi;
             i := i + 1;
         od;
-        Print("\nPossible sigma_rs: ", possibleRs);
         if Length(possibleRs) = 1 then 
             return possibleRs[1];
         else

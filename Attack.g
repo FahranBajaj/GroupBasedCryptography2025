@@ -200,14 +200,10 @@ TestConjugatorPortraitForParameters := function(G, list_sizes, g_lengths, r_leng
 		local depth, extended_portrait1, extended_portrait2;
 
 		if Size(port) = 1 then 
-			return [AutomPortrait(port[1]), AutomPortraitDepth(port[1])];              
+			return AutomPortrait(port[1]);              
 		else 
-			extended_portrait1 := ExtendPortrait(port[2]);
-			extended_portrait2 := ExtendPortrait(port[3]); 
-
-			depth := Maximum(extended_portrait1[2], extended_portrait2[2]) + 1;
-			
-			return [ [port[1], extended_portrait1[1], extended_portrait2[1]], depth ]; 
+			extended_children := List([2..Length(port)], index -> ExtendedPortrait(port[index]));
+			return Append([port[1]], extended_children);
 		fi; 
 	end;	
 
@@ -215,33 +211,22 @@ TestConjugatorPortraitForParameters := function(G, list_sizes, g_lengths, r_leng
 		local pruned_portrait, depth, pruned_1, pruned_2;                                
 
 		if Size(port) = 1 then 
-			return [port, 0]; 
+			return port; 
 		fi;  
 
 		pruned_portrait := port;
-
-		if Size(port[2]) > 1 or Size(port[3]) > 1 then
-			pruned_1 := PrunePortrait(port[2]);
-			pruned_2 := PrunePortrait(port[3]);
-
-			depth := Maximum(pruned_1[2], pruned_2[2]) + 1;
-
-			pruned_portrait := [port[1], pruned_1[1], pruned_2[1]];
-		else
-			depth := 1; 
-		fi;      
-
+		pruned_children := List([2..Length(port)], index -> PrunePortrait(port[index]));
+		pruned_portrait := Append([port[1]], pruned_children);     
 		if pruned_portrait in N_portraits then 
 			return [ [NucleusElementByPortrait(pruned_portrait)], 0 ]; 
 		fi;
-
-		return [pruned_portrait, depth]; 
+		return pruned_portrait;
 	end;
 
 	ContractingPortrait := function(port) 
 		local cportrait;
 		cportrait := ExtendPortrait(port);
-		cportrait := PrunePortrait(cportrait[1]);
+		cportrait := PrunePortrait(cportrait);
 		return cportrait;
 	end;
 
@@ -300,6 +285,18 @@ TestConjugatorPortraitForParameters := function(G, list_sizes, g_lengths, r_leng
 		return PermList(l);
 	end;
 
+	WreathToPortrait := function(sections, permutation, depth_for_portrait)
+		if depth_for_portrait = 0 then 
+			return sections[1];
+		fi;
+		portrait := [permutation];
+		for i in [1..Length(sections)] do 
+			ith_portrait := WreathToPortrait(Sections(sections[i], 1), PermOnLevel(sections[i], 1), depth_for_portrait - 1);
+			portrait[i+1] := ith_portrait;
+		od;
+		return portrait;
+	end;
+
 	#Recover portrait of secret conjugator
 	ConjugatorPortrait:=function( g_list, h_list, key_length )
 		local t, branch_count, odd_g_idxs, gh_extended, portrait;
@@ -330,6 +327,7 @@ TestConjugatorPortraitForParameters := function(G, list_sizes, g_lengths, r_leng
 			SortBy(related_r_sections, orbit -> Length(orbit)); #arrange from smallest to largest
 
 			#Recover as many sections as needed and fill in the rest
+			sections_of_r := [];
 			for set_of_related_r_sections in related_r_sections do 
 				for i in set_of_related_r_sections do 
 					#Attemptting to recover r_i
@@ -367,13 +365,55 @@ TestConjugatorPortraitForParameters := function(G, list_sizes, g_lengths, r_leng
 					#If we get here, we have the portrait of r_i.
 					#We need to express this as a tree automorphism to compute the other relevant sections.
 
-					
+					r_i_permutation := PermutationOfNestedPortrait(portrait_of_r_i, contracting_depth + nucleus_distinct_level - lev + 1);
+					r_i_sections := PortraitToMaskBoundaryNonuniform(portrait_of_r_i, contracting_depth + nucleus_distinct_level - lev + 1);
+					r_i := TreeAutomorphism(r_i_sections, r_i_permutation);
+					sections_of_r[i] := r_i;
+					new_r_sections := [i];
+					newer_r_sections := [];
+					number_recovered := 1;
+					while number_recovered < Length(set_of_related_r_sections) do
+						for index in new_r_sections do 
+							for g_h_index in [1..Length(g_list)] do 
+								g := g_list[g_h_index];
+								sigma_g := PermOnLevel(g, 1);
+								h := h_list[g_h_index];
+								cycle_member := index^sigma_g;
+								h_index := index^sigma_r;
+								new_section := Section(g^-1, index)*sections_of_r[index]*Section(h, h_index)
+								while cycle_member <> index do 
+									if not (IsBound(sections_of_r[cycle_member])) then
+										sections_of_r[cycle_member] := new_section;
+										number_recovered := number_recovered + 1;
+									fi;
+									h_index := h_index^sigma_h;
+									new_section := Section(g^-1, cycle_member) * new_section * Section(h, h_index);
+									cycle_member := cycle_member^sigma_g;	
+									if number_recovered = Length(set_of_related_r_sections) then 
+										break;
+									fi;
+								od;
+								if number_recovered = Length(set_of_related_r_sections) then 
+									break;
+								fi;
+							od;
+							if number_recovered = Length(set_of_related_r_sections) then 
+								break;
+							fi;
+						od;
+						new_r_sections := newer_r_sections;
+						newer_r_sections := [];
+					od;
 
 					#got all sections in this set, move onto the next one
 					break;
 				od;
 			od;
 			
+			#If we get this far, we have recovered the action of r on the first level  
+			#as well as all of the sections. The last thing we need to do is convert
+			#these back into a portrait and return.
+			return WreathToPortrait(sections_of_r, sigma_r, contracting_depth + nucleus_distinct_level - lev + 2);
 
 		end; # End of ConjugatorPortraitRecursive	
 
@@ -382,138 +422,9 @@ TestConjugatorPortraitForParameters := function(G, list_sizes, g_lengths, r_leng
 		# Approximate running time of call to ConjugatorPortrait
 		t := Runtime() - t;
 
-		return [portrait, t, branch_count];
+		return [portrait, t];
 
 	end; # End of ConjugatorPortrait
-
-	# --- testing ---
-
-	TestConjugatorPortrait := function(list_size, g_length, conj_length)
-		local successes, i, g_list, r, h_list, gh_extended, number_of_factors, result, r_portrait, depth, time, branches, t;
-		successes := 0;
-		time := [];
-		branches := [];
-
-		for i in [1..attempts] do
-
-			Print("Attempt #", i, "\n");
-			t := Runtime();
-
-			g_list := RandomElementList(g_length, G, list_size);
-			r := RandomElement(conj_length, G);
-			Print("Time to generate elements: ", Runtime() - t, "\n");
-
-			t := Runtime();
-
-			h_list := List(g_list, x -> r^-1*x*r);
-			Print("Time to conjugate elements: ", Runtime() -t, "\n");
-
-			t := Runtime();
-
-			if g_length <= conj_length then
-				# how many g's do we need to multiply for a g as long as the conjugator?
-				number_of_factors := Int(Ceil(Float(conj_length/g_length))); 
-				# Pass n_o_f + ( n_o_f mod 2 ) so that if our list is all odds, we get all evens instead
-				gh_extended := ExtendLists( g_list, h_list, number_of_factors + (number_of_factors mod 2) );
-				Append( g_list, gh_extended[1] );
-				Append( h_list, gh_extended[2] );
-
-			elif list_size < 50 then
-				gh_extended := ExtendLists( g_list, h_list, 2 );
-				# (also means that we double the length when g_length = conj_length)
-				Append( g_list, gh_extended[1] );
-				Append( h_list, gh_extended[2] );
-			fi;
-
-			Print("Time to extend lists: ", Runtime() -t, "\n");
-
-
-			# ConjugatorPortrait returns list [ [portrait, depth], runtime, branch_count ]
-			result := ConjugatorPortrait(g_list, h_list, conj_length);
-			Add(time, result[2]);
-
-			if not result[1] = fail then
-			    r_portrait := result[1][1];
-
-			    if r_portrait = AutomPortrait(r) then
-				successes := successes + 1;
-				Print("Success! Runtime = ", result[2], ", branch count = ", result[3], "\n"); 
-			    else
-				# If a list is returned but it isn't the right portrait, something is wrong
-				Error("output is not AutomPortrait");
-			    fi;
-			fi;
-
-		od;
-		
-		# [proportion success, average time]
-		return [ Float(successes/attempts), Float(Sum(time)/attempts) ];
-
-	end; # End of TestConjugatorPortrait
-
-	
-	for size in list_sizes do
-		for g_len in g_lengths do
-			for r_len in r_lengths do
-				result := TestConjugatorPortrait( size, g_len, r_len);
-				if filename = "" then
-					Print("List Size: ", size, ", g Length: ", g_len, ", Conjugator Length: ", r_len, "; Proportion of Success: ", result[1], ", Avg Time: ", result[2], "\n");
-				else
-					AppendTo(filename, "List Size: ", size, ", g Length: ", g_len, ", Conjugator Length: ", r_len, "; Proportion of Success: ", result[1], ", Avg Time: ", result[2], "\n");
-				fi;
-			od;
-		od;
-	od;
-
 end;
 
 
-
-
-
-# ---- Functions for testing (load CSP_attack.g first) ----
-
-
-# Tests the ConjugatorPortrait function in specified group G
-TestConjugatorPortrait := function(G, list_size, g_length, conj_length, attempts)
-	local successes, i, g_list, r, h_list, result, r_portrait, depth, time, branches, t;
-	successes := 0;
-	time := [];
-	branches := [];
-
-	for i in [1..attempts] do
-
-		Print("Attempt #", i, "\n");
-		t := Runtime();
-
-		g_list := RandomElementList(g_length, G, list_size);
-		r := RandomElement(conj_length, G);
-		Print("Time to generate elements: ", Runtime() - t, "\n");
-
-		t := Runtime();
-
-		h_list := List(g_list, x -> r^-1*x*r);
-		Print("Time to conjugate elements: ", Runtime() -t, "\n");
-
-
-		# ConjugatorPortrait returns list [ [portrait, depth], runtime, branch_count ]
-		result := ConjugatorPortrait(g_list, h_list, conj_length);
-		Add(time, result[2]);
-
-		if not result[1] = fail then
-		    r_portrait := result[1][1];
-
-		    if r_portrait = AutomPortrait(r) then
-			successes := successes + 1;
-			Print("Success! Runtime = ", result[2], ", branch count = ", result[3], "\n"); 
-		    else
-			# If a list is returned but it isn't the right portrait, something is wrong
-			Error("output is not AutomPortrait");
-		    fi;
-		fi;
-
-	od;
-
-	# [proportion success, average time]
-	return [ Float(successes/attempts), Float(Sum(time)/attempts) ];
-end;

@@ -31,8 +31,6 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 		TestConjugatorPortrait, size, g_len, r_len, result, TestConjugacyRelationships, recoveringL1, IntersectionOfTuples, L, extended_children,
 		ExtendedPortrait, pruned_children, PortraitToMaskBoundaryNonuniform, PermutationOfNestedPortrait, WreathToPortrait, portrait, i, ith_portrait,
 		FindAllConjugators;
-	# --- Group-specific computations ---
-
 	# Finds maximum level at which elements of length <= len contract to nucleus
 	MaxContractingDepth := function(len)
 		local level, elements, elem_depths;
@@ -259,21 +257,21 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 	end;
 
 	PortraitToMaskBoundaryNonuniform := function(portrait , depth_of_portrait)
-		local i , sections, d;
+		local i , sections, d, lower_sections;
 		
 		Print("Portrait: ", portrait, "depth: ", depth_of_portrait, "\n");
 		Print(Length(portrait), "\n");
 
 		if depth_of_portrait=0 then
 			if Length(portrait)=1 then
-				return portrait;
+				return List([1..N_LETTERS], i -> One(G));
 			else
 				Error("PortraitToMaskBoundaryNonuniform: <depth_of_portrait> cannot be smaller than the depth of the portrait");
 			fi;
 		fi;
 
 		if Length(portrait)=1 then 
-			return Sections(portrait[1], depth_of_portrait); 
+			return List([1..N_LETTERS], i -> One(G));
 		fi;
 
 		d := Length(portrait) - 1;
@@ -284,25 +282,23 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 			Print("Current portrait: ", portrait, ", current depth: ", depth_of_portrait, "\n");
 			Print("i value: ", i, "\n");
 			Print("Next call: ", portrait[i+1], ", ", depth_of_portrait-1, "\n");
-			Append(sections, PortraitToMaskBoundaryNonuniform(portrait[i+1],depth_of_portrait-1));
+			lower_sections := PortraitToMaskBoundaryNonuniform(portrait[i+1],depth_of_portrait-1);
+			Append(sections, TreeAutomorphism(Sections(lower_sections, 1), portrait[i+1][1]));
 		od;
 
 		return sections;
 	end;
 
 	PermutationOfNestedPortrait := function(portrait, depth_of_portrait)
-		local i, d, perms, l;
+		local i, d, perms, l, id_sections;
 
 		if depth_of_portrait=1 then
-			if Length(portrait)=1 then
-				return PermOnLevel(portrait[1], depth_of_portrait);
-			else
-				return portrait[1];
-			fi;
+			return portrait[1];
 		fi;
 
 		if Length(portrait)=1 then 
-			return PermOnLevel(portrait[1], depth_of_portrait); 
+			id_sections := List([1..N_LETTERS], i -> One(G));
+			return PermOnLevel(TreeAutomorphism(id_sections, portrait[1]), depth_of_portrait); 
 		fi;
 
 		d := Length(portrait) - 1;
@@ -466,8 +462,15 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 	return ConjugatorPortrait(g_list, h_list, r_length)[1];
 end;
 
+#G := AutomatonGroup("a = (1, 1)(1, 2), b = (a, c), c = (a, d), d = (1, b)");
+#g_list := [a*b*a*c, d*a*c, a*c*a*b*a*d*a*c*a, a*b*a*d*a, a*c, b*a*c*a, d*a];
+#r := a*c*a;
+#h_list := List(g_list, g -> r^-1*g*r);
+#Print(ConjugatorPortrait(G, g_list, h_list, 3, 2));
+
 G := AutomatonGroup("a = (1, 1)(1, 2), b = (a, c), c = (a, d), d = (1, b)");
-g_list := [a*b*a*c, d*a*c, a*c*a*b*a*d*a*c*a, a*b*a*d*a, a*c, b*a*c*a, d*a];
+g_list := [ b^-1*c^-1, d^-3, a^-1*c^-2*d^-1];
+h_list := [ a^3*b^-2*c^-1*b*a^-3, a^3*b^-1*d^-3*b*a^-3, a^3*b^-1*a^-1*c^-2*d^-1*b*a^-3];
 r := a*c*a;
-h_list := List(g_list, g -> r^-1*g*r);
+ 
 Print(ConjugatorPortrait(G, g_list, h_list, 3, 2));

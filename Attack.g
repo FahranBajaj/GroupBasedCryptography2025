@@ -261,37 +261,37 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 	PortraitToMaskBoundaryNonuniform := function(portrait , depth_of_portrait)
 		local i , sections, lower_sections, top_level_permutation;
 		
-		Print("Converting portrait to mask\n");
-		Print("Portrait: ", portrait, "depth: ", depth_of_portrait, "\n");
+		#Print("Converting portrait to mask\n");
+		#Print("Portrait: ", portrait, "depth: ", depth_of_portrait, "\n");
 
 		if depth_of_portrait=0 then
 			if Length(portrait)=1 then
-				return Sections(portrait[1], 1);
+				#Print("Base case. Returning ", portrait, "\n");
+				return portrait;
 			else
 				Error("PortraitToMaskBoundaryNonuniform: <depth_of_portrait> cannot be smaller than the depth of the portrait");
 			fi;
+		elif depth_of_portrait = 1 then 
+			return List([1..N_LETTERS], i -> portrait[i+1][1]);
 		fi;
 
+
 		if Length(portrait)=1 then 
-			Print("Length 1, returning ", Sections(portrait[1], 1), "\n");
+			#Print("Length 1, returning ", Sections(portrait[1], 1), "\n");
 			return Sections(portrait[1], 1);
 		fi;
 
 		sections:=[];
 
 		for i in [1..N_LETTERS] do
-			Print("Current portrait: ", portrait, ", current depth: ", depth_of_portrait, "\n");
-			Print("i value: ", i, "\n");
-			Print("Next call: ", portrait[i+1], ", ", depth_of_portrait-1, "\n");
+			#Print("Current portrait: ", portrait, ", current depth: ", depth_of_portrait, "\n");
+			#Print("i value: ", i, "\n");
+			#Print("Next call: ", portrait[i+1], ", ", depth_of_portrait-1, "\n");
 			lower_sections := PortraitToMaskBoundaryNonuniform(portrait[i+1],depth_of_portrait-1);
-			if depth_of_portrait > 1 then 
-				top_level_permutation := PermActionOnLevel(PermutationOfNestedPortrait(portrait[i+1], depth_of_portrait - 1), depth_of_portrait - 1, 1, N_LETTERS);
-			else 
-				top_level_permutation := PermOnLevel(portrait[i+1][1], 1);
-			fi;
+			top_level_permutation := PermActionOnLevel(PermutationOfNestedPortrait(portrait[i+1], depth_of_portrait - 1), depth_of_portrait - 1, 1, N_LETTERS);
 			Append(sections, [TreeAutomorphism(lower_sections, top_level_permutation)]);
 		od;
-
+		#Print("Returning ", sections);
 		return sections;
 	end;
 
@@ -427,7 +427,9 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 								sigma_h := PermOnLevel(h, 1);
 								cycle_member := index^sigma_g;
 								h_index := index^sigma_r;
-								new_section := Section(g^-1, index)*sections_of_r[index]*Section(h, h_index);
+								Print("Current g value: ", g, "\n");
+								Print("Current h value: ", h, "\n");
+								new_section := Section(g, index)^-1*sections_of_r[index]*Section(h, h_index);
 								while cycle_member <> index do 
 									if not (IsBound(sections_of_r[cycle_member])) then
 										Print("Section of r number ", cycle_member, ": ", new_section, "\n");
@@ -435,7 +437,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 										number_recovered := number_recovered + 1;
 									fi;
 									h_index := h_index^sigma_h;
-									new_section := Section(g^-1, cycle_member) * new_section * Section(h, h_index);
+									new_section := Section(g, cycle_member)^-1 * new_section * Section(h, h_index);
 									cycle_member := cycle_member^sigma_g;	
 									if number_recovered = Length(set_of_related_r_sections) then 
 										break;

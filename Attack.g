@@ -340,15 +340,15 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 			local sigma_r, sigma_gs, related_r_sections, set_of_related_r_sections, i, new_g_list, new_h_list, g_h_index,
 				sigma_g, sections_of_r, lhs, g, h, next, rhs, portrait_of_r_i,
 				cycle_member, number_recovered, h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation,
-				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs;
+				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, current_portrait_depth;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
 				return fail;
 			fi;
 
-			#MIGHT NEED TO UPDATE THIS
-			if level = contracting_depth + nucleus_distinct_level then
+			current_portrait_depth := contracting_depth + nucleus_distinct_level - level + 1;
+			if current_portrait_depth = 1 then
 				return [sigma_r, [placeholder], [placeholder]]; 
 			fi;
 
@@ -397,9 +397,8 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 
 					#If we get here, we have the portrait of r_i.
 					#We need to express this as a tree automorphism to compute the other relevant sections.
-
-					r_i_permutation := PermutationOfNestedPortrait(portrait_of_r_i, contracting_depth + nucleus_distinct_level - level + 1);
-					r_i_sections := PortraitToMaskBoundaryNonuniform(portrait_of_r_i, contracting_depth + nucleus_distinct_level - level + 1);
+					r_i_permutation := PermActionOnLevel(PermutationOfNestedPortrait(portrait_of_r_i, current_portrait_depth), current_portrait_depth, 1, N_LETTERS);
+					r_i_sections := PortraitToMaskBoundaryNonuniform(portrait_of_r_i, current_portrait_depth);
 					r_i := TreeAutomorphism(r_i_sections, r_i_permutation);
 					sections_of_r[i] := r_i;
 					new_r_sections := [i];
@@ -447,7 +446,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 			#If we get this far, we have recovered the action of r on the first level  
 			#as well as all of the sections. The last thing we need to do is convert
 			#these back into a portrait and return.
-			return WreathToPortrait(sections_of_r, sigma_r, contracting_depth + nucleus_distinct_level - level + 2);
+			return WreathToPortrait(sections_of_r, sigma_r, current_portrait_depth + 1);
 
 		end; # End of ConjugatorPortraitRecursive	
 

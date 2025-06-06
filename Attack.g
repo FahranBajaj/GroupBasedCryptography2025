@@ -337,7 +337,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 			local sigma_r, sigma_gs, related_r_sections, set_of_related_r_sections, i, new_g_list, new_h_list, g_h_index,
 				sigma_g, sections_of_r, lhs, g, h, next, rhs, portrait_of_r_i,
 				cycle_member, number_recovered, h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation,
-				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, current_portrait_depth;
+				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, current_portrait_depth, j;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			#Print("On level ", level, " recovered sigma_r as ", sigma_r, "\n");
@@ -409,7 +409,14 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 					sections_of_r[i] := r_i;
 					new_r_sections := [i];
 					newer_r_sections := [];
-					number_recovered := 1;
+					number_recovered := 0;
+					for j in [1..Length(sections_of_r)] do 
+						if IsBound(sections_of_r[j]) then 
+							if j in set_of_related_r_sections then 
+								number_recovered := number_recovered + 1;
+							fi;
+						fi;
+					od;
 					while number_recovered < Length(set_of_related_r_sections) do
 						for index in new_r_sections do 
 							for g_h_index in [1..Length(g_list)] do 

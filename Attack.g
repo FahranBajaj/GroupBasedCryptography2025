@@ -488,7 +488,7 @@ end;
 
 G := AutomatonGroup("a = (1, 1)(1, 2), b = (a, c), c = (a, d), d = (1, b)");
 g_list := [ b^-1*c^-1, d^-3, a^-1*c^-2*d^-1, b*c, d, a*d, b*a];
-r := a*c*a;
+r := d*a;
 h_list := List(g_list, g -> g^r);
  
 Print("Final result: ", ConjugatorPortrait(G, g_list, h_list, 3, 2));

@@ -20,17 +20,13 @@ NoRepeats := function(L)
 	return no_repeats;
 end;
 
-# ----------------------------------------------------------------------------------------------------
-# ------------------------- Testing Function for Lists of Parameters----------------------------------
-# ----------------------------------------------------------------------------------------------------
 ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 
 	local nucleus, NucleusMaxLength, MaxContractingDepth, M, N, placeholder, PortraitDepthUpperBound, contracting_depth, PermGroups, AreNotConjugateOnLevel,
-        ConjugatorEvenFirstLevel, NucleusDistinctLevel, nucleus_distinct_level, N_perms, N_masks, N_portraits, NucleusElementByPermutation, 
-		NucleusElementByPortrait, ExtendPortrait, PrunePortrait, ContractingPortrait, ConjugatorPortrait, ConjugatorPortraitRecursive, 
-		TestConjugatorPortrait, size, g_len, r_len, result, TestConjugacyRelationships, recoveringL1, IntersectionOfTuples, L, extended_children,
+        ConjugatorEvenFirstLevel, nucleus_distinct_level, N_perms, N_masks, ExtendPortrait, PrunePortrait, ContractingPortrait, ConjugatorPortrait, 
+		ConjugatorPortraitRecursive, TestConjugatorPortrait, size, g_len, r_len, result, TestConjugacyRelationships, recoveringL1, IntersectionOfTuples, L, extended_children,
 		ExtendedPortrait, pruned_children, PortraitToMaskBoundaryNonuniform, PermutationOfNestedPortrait, WreathToPortrait, portrait, i, ith_portrait,
-		FindAllConjugators;
+		FindAllConjugators, AssignNucleusElements, NucleusElementByPermutation, PortraitToNucleusByPermutation;
 	# Finds maximum level at which elements of length <= len contract to nucleus
 	MaxContractingDepth := function(len)
 		local level, elements, elem_depths;
@@ -206,56 +202,52 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 
 	N_perms := List(nucleus, x -> PermOnLevel(x, nucleus_distinct_level));
 
-	N_portraits := List(nucleus, n -> AutomPortrait(n)); 
+	PortraitToNucleusByPermutation := function( port )
+		local portrait_permutation, i;
 
-	# function to take portrait of depth 1 ([perm, [word], [word]]) 
-	# and if it is in the nucleus, return element of nucleus
-	NucleusElementByPortrait := function( port )
-	        local i;
+		portrait_permutation := PermutationOfNestedPortrait(port, nucleus_distinct_level);
 	
 		for i in [1..Size(nucleus)] do
-			if port = N_portraits[i] then 
+			if portrait_permutation = N_perms[i] then
 				return nucleus[i];
 			fi;
 		od;
-
-		return fail;
+		Error("Did not reach element of the nucleus at contracting_depth");	
 	end;
 
-	ExtendPortrait := function(port)
-		local depth, extended_children, extended_portrait;
-
-		if Size(port) = 1 then 
-			return AutomPortrait(port[1]);              
-		else 
-			extended_children := List([2..Length(port)], index -> ExtendPortrait(port[index]));
-			extended_portrait := [port[1]];
-			Append(extended_portrait, extended_children);
-			return extended_portrait;
-		fi; 
-	end;	
-
-	PrunePortrait := function (port) 
-		local pruned_portrait, depth, pruned_1, pruned_2;                                
-
-		if Size(port) = 1 then 
-			return port; 
-		fi;  
-
-		pruned_children := List([2..Length(port)], index -> PrunePortrait(port[index]));
-		pruned_portrait := [port[1]];
-		Append(pruned_portrait, pruned_children);
-		if pruned_portrait in N_portraits then 
-			return [ [NucleusElementByPortrait(pruned_portrait)], 0 ]; 
+	#given portrait with a bunch of placeholders, replace with nucleus elements
+	AssignNucleusElements := function(portrait, portrait_depth)
+		#unwrap layers of portrait that are not necessarily nucleus elements
+		if portrait_depth > nucleus_distinct_level then
+			return Concatenation([portrait[1]], List([1..N_LETTERS], i -> AssignNucleusElements(portrait[i+1], portrait_depth - 1)));
 		fi;
-		return pruned_portrait;
+
+		return [PortraitToNucleusByPermutation(portrait)];
 	end;
 
-	ContractingPortrait := function(port) 
-		local cportrait;
-		cportrait := ExtendPortrait(port);
-		cportrait := PrunePortrait(cportrait);
-		return cportrait;
+	PrunePortrait := function(portrait)
+		local nucleus, nucleus_identified , prune ;
+
+		nucleus := List(GroupNucleus(G), x-> [x]) ; 
+		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
+
+		prune := function(p) 
+			local p_int , i ; 
+			p_int := [] ;
+			if p in nucleus then 
+				return p ;
+			else 
+				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1]))) ;
+				for i in [1..Length(nucleus_identified)] do 
+						if p_int = nucleus_identified[i][2] then
+							return nucleus_identified[i][1];
+						fi;
+					od;
+				return p_int ;
+			fi;
+		end;
+
+		return prune(portrait);
 	end;
 
 	PortraitToMaskBoundaryNonuniform := function(portrait , depth_of_portrait)
@@ -465,19 +457,19 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 			#these back into a portrait and return.
 			Print("On level ", level, ", ecovered these sections of r: ", sections_of_r, "\n");
 			Print("Returning this portrait, ", WreathToPortrait(sections_of_r, sigma_r, current_portrait_depth + 1), "\n");
+			Print("contracting_depth is ", contracting_depth, ", nucleus_distinct_level is ", nucleus_distinct_level, "\n");
 			return WreathToPortrait(sections_of_r, sigma_r, current_portrait_depth + 1);
 
 		end; # End of ConjugatorPortraitRecursive	
 
-		portrait := ContractingPortrait(ConjugatorPortraitRecursive( g_list, h_list, 1));
+		portrait := ConjugatorPortraitRecursive(g_list, h_list, 1);
+		cportrait := AssignNucleusElements(portrait, contracting_depth + nucleus_distinct_level);
+		cportrait := PrunePortrait(cportrait);
 
-		# Approximate running time of call to ConjugatorPortrait
-		t := Runtime() - t;
-
-		return [portrait, t];
+		return cportrait;
 
 	end; # End of ConjugatorPortrait
-	return ConjugatorPortrait(g_list, h_list, r_length)[1];
+	return ConjugatorPortrait(g_list, h_list, r_length);
 end;
 
 #G := AutomatonGroup("a = (1, 1)(1, 2), b = (a, c), c = (a, d), d = (1, b)");
@@ -490,6 +482,6 @@ G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1,
 g_list := List([1..10], i -> Random(G));
 r := a23*a12*a13*a23*a12*a13*a23*a13;
 h_list := List(g_list, g -> g^r);
-final := ConjugatorPortrait(G, g_list, h_list, 3, 2);
+final := ConjugatorPortrait(G, g_list, h_list, 8, 2);
  
 Print("Final result: ", final);

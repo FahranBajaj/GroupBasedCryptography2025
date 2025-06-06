@@ -1,5 +1,5 @@
 LoadPackage("AutomGrp");
-N_LETTERS := 2;
+N_LETTERS := 3;
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
 
@@ -355,8 +355,8 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 
 			current_portrait_depth := contracting_depth + nucleus_distinct_level - level;
 			if current_portrait_depth = 0 then
-				Print("Base case. Returning this portrait: ", [sigma_r, [placeholder], [placeholder]], "\n");
-				return [sigma_r, [placeholder], [placeholder]]; 
+				Print("Base case. Returning this portrait: ", Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])), "\n");
+				return Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])); 
 			fi;
 
 			#If we get to this point, we know how r acts on the first level
@@ -486,9 +486,10 @@ end;
 #h_list := List(g_list, g -> r^-1*g*r);
 #Print(ConjugatorPortrait(G, g_list, h_list, 3, 2));
 
-G := AutomatonGroup("a = (1, 1)(1, 2), b = (a, c), c = (a, d), d = (1, b)");
-g_list := [ b^-1*c^-1, d^-3, a^-1*c^-2*d^-1, b*c, d, a*d, b*a];
-r := d*a;
+G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)");
+g_list := List([1..10], i -> Random(G));
+r := a23*a12*a13*a23*a12*a13*a23*a13;
 h_list := List(g_list, g -> g^r);
+final := ConjugatorPortrait(G, g_list, h_list, 3, 2);
  
-Print("Final result: ", ConjugatorPortrait(G, g_list, h_list, 3, 2));
+Print("Final result: ", final);

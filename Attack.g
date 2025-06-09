@@ -1,7 +1,7 @@
 LoadPackage("AutomGrp");
-N_LETTERS := 3;
 CONJUGATION_ACTION := OnPoints; # action is conjugation
-
+G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)"); #Hanoi 3 Group
+N_LETTERS := DegreeOfTree(G);
 
 # Returns true if list L contains no repeat elements 
 NoRepeats := function(L)
@@ -340,14 +340,14 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, current_portrait_depth, j;
 
 			sigma_r := recoveringL1(g_list, h_list);
-			Print("On level ", level, " recovered sigma_r as ", sigma_r, "\n");
+			#Print("On level ", level, " recovered sigma_r as ", sigma_r, "\n");
 			if sigma_r = fail then 
 				return fail;
 			fi;
 
 			current_portrait_depth := contracting_depth + nucleus_distinct_level - level;
 			if current_portrait_depth = 0 then
-				Print("Base case. Returning this portrait: ", Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])), "\n");
+				#Print("Base case. Returning this portrait: ", Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])), "\n");
 				return Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])); 
 			fi;
 
@@ -383,14 +383,14 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
-					Print("Making recursive call to level ", level + 1, "\n");
-					Print("New gs: ", new_g_list, "\n");
-					Print("New hs: ", new_h_list, "\n");
+					#Print("Making recursive call to level ", level + 1, "\n");
+					#Print("New gs: ", new_g_list, "\n");
+					#Print("New hs: ", new_h_list, "\n");
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if i = Length(set_of_related_r_sections) then 
 							#could not recover any section in this set
-							Print("Failed to recover sections at level ", level, "\n");
+							#Print("Failed to recover sections at level ", level, "\n");
 							return fail;
 						else 
 							#try another section in this set
@@ -402,10 +402,10 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 					#We need to express this as a tree automorphism to compute the other relevant sections.
 					r_i_permutation := PermActionOnLevel(PermutationOfNestedPortrait(portrait_of_r_i, current_portrait_depth), current_portrait_depth, 1, N_LETTERS);
 					r_i_sections := PortraitToMaskBoundaryNonuniform(portrait_of_r_i, current_portrait_depth);
-					Print("r_i_sections: ", r_i_sections, "\n");
-					Print("current_portrait_depth: ", current_portrait_depth, "\n");
+					#Print("r_i_sections: ", r_i_sections, "\n");
+					#Print("current_portrait_depth: ", current_portrait_depth, "\n");
 					r_i := TreeAutomorphism(r_i_sections, r_i_permutation);
-					Print("Section of r number ", i, ": ", r_i, "\n");
+					#Print("Section of r number ", i, ": ", r_i, "\n");
 					sections_of_r[i] := r_i;
 					new_r_sections := [i];
 					newer_r_sections := [];
@@ -426,12 +426,12 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 								sigma_h := PermOnLevel(h, 1);
 								cycle_member := index^sigma_g;
 								h_index := index^sigma_r;
-								Print("Current g value: ", g, "\n");
-								Print("Current h value: ", h, "\n");
+								#Print("Current g value: ", g, "\n");
+								#Print("Current h value: ", h, "\n");
 								new_section := Section(g, index)^-1*sections_of_r[index]*Section(h, h_index);
 								while cycle_member <> index do 
 									if not (IsBound(sections_of_r[cycle_member])) then
-										Print("Section of r number ", cycle_member, ": ", new_section, "\n");
+										#Print("Section of r number ", cycle_member, ": ", new_section, "\n");
 										sections_of_r[cycle_member] := new_section;
 										number_recovered := number_recovered + 1;
 										Append(newer_r_sections, [cycle_member]);
@@ -483,36 +483,14 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 	return ConjugatorPortrait(g_list, h_list, r_length);
 end;
 
-G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)");
-g_list := [ a12, One(G), a12, One(G), a13, (a23*a13)^2*a23, a13, a13, a12*a13*a12, a23*a13*a12];
-r := a23*(a13*a12)^2;
+
+
+Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
+g_list := List([1..10], i -> Random(G));
+r := Random(G);
 h_list := List(g_list, g -> r^-1*g*r);
 final := ConjugatorPortrait(G, g_list, h_list, 5, 2);
-
-#Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
-#G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)");
-#generators := [a23, a13, a12];
-#number_finished := 0;
-#number_correct := 0;	
-#for trial in [1..100] do 
-#	g_list := List([1..10], i -> Random(G));
-#	r := One(G);
-#	r_len := Random([1..10]);
-#	for i in [1..r_len] do 
-#		r := r * Random(generators);
-#	od;
-#	h_list := List(g_list, g -> g^r);
-#	Print("list of gs: ", g_list, ", r: ", r, "\n");
-#	recovered_portrait := ConjugatorPortrait(G, g_list, h_list, r_len, 2);
-#	if recovered_portrait <> fail then 
-#		number_finished := number_finished + 1;
-#		if recovered_portrait = AutomPortrait(r) then
-#			number_correct := number_correct + 1;
-#		fi;
-#	fi;
-#	if trial mod 10 = 0 then 
-#		Print("Done with ", trial, " trials.\n");
-#	fi;
-#od;
-#Print("Finished ", number_finished, ", with ", number_correct, " correct.");
- 
+Print(final);
+if final <> fail then 	
+	Print(final = AutomPortrait(r));
+fi;

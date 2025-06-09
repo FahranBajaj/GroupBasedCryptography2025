@@ -1,4 +1,5 @@
 # Creates new g,h lists of length 50, with new elements multiples of number_of_factors factors of g's 	
+LoadPackage("AutomGrp");
 ExtendLists:=function(g_list, h_list, number_of_factors, listLen)
 	local new_g_list, new_h_list, i, idxs, gs, hs;
 
@@ -19,20 +20,20 @@ ExtendLists:=function(g_list, h_list, number_of_factors, listLen)
 end;
 
 ElemWithPermutation := function(g_s, h_s, sigma)
-    local permGroup, h1, h2, g, h;
-
+    local G, H, permGroup, F, FGenerators, FToPerm, FToG, FToH, sigmaInF, g, h;
     G := Group(g_s);
-
+    H := Group(h_s);
     permGroup := PermGroupOnLevel(G, 1);
+    F := FreeGroup(Length(g_s));
+    FGenerators := GeneratorsOfGroup(F);
+    FToPerm := GroupHomomorphismByImagesNC(F, permGroup, FGenerators, List(g_s, g -> PermOnLevel(g, 1)));
+    FToG := GroupHomomorphismByImagesNC(F, G, FGenerators, g_s);
+    FToH := GroupHomomorphismByImagesNC(F, H, FGenerators, h_s);
+    sigmaInF := PreImagesRepresentative(FToPerm, sigma);
+    g := FToG(sigmaInF);
+    h := FToH(sigmaInF);
+    return [g, h];
 
-    h1 := GroupHomomorphismByImagesNC(G, permGroup, G, List(G, g -> PermOnLevel(g, 1)));
-    #h2 := GroupHomomorphismByImagesNC(Group(g_s), Group(h_s), g_s, h_s);
-
-    g := PreImagesRepresentative(h1, sigma);
-    #h := Image(h2, g);
-    h := One(G);
-
-    return[g, h];
 end;
  
 
@@ -57,21 +58,10 @@ list_extension := function(G, gs, hs, listLen, wordLen)
         gh_output := ElemWithPermutation(gs, hs, gP_inverse);
 
         # find the corresponding word in list
-        trivial_actions_gs[i] := g*gh_output[0];
-        trivial_actions_hs[i] := h*gh_output[1];
+        trivial_actions_gs[i] := g*gh_output[1];
+        trivial_actions_hs[i] := h*gh_output[2];
     od;
 
-    Print("\n", gs);
-    Print("\n", hs);
-    Print("\n\n");
-
-    Print("\n", new_gs);
-    Print("\n", new_hs);
-
-    Print("\n\n");
-
-    Print("\n", trivial_actions_gs);
-    Print("\n", trivial_actions_hs);
 
 
 
@@ -79,9 +69,10 @@ list_extension := function(G, gs, hs, listLen, wordLen)
 end;
 
 G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)"); #gr: hanoi 3
-
+AG_UseRewritingSystem(G);
+AG_UpdateRewritingSystem(G, 3);
 gs := [a23*a12, a12*a13^-1];
 r := a12;
 hs := List(gs, x -> x^r);
 
-Print(list_extension(G, gs, hs, 5, 5));
+Print(list_extension(G, gs, hs, 5, 5), "\n");

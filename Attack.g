@@ -1,7 +1,5 @@
 LoadPackage("AutomGrp");
 CONJUGATION_ACTION := OnPoints; # action is conjugation
-G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)"); #Hanoi 3 Group
-N_LETTERS := DegreeOfTree(G);
 
 # Returns true if list L contains no repeat elements 
 NoRepeats := function(L)
@@ -22,11 +20,14 @@ end;
 
 ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 
-	local nucleus, NucleusMaxLength, MaxContractingDepth, M, N, placeholder, PortraitDepthUpperBound, contracting_depth, PermGroups, AreNotConjugateOnLevel,
+	local N_LETTERS, nucleus, NucleusMaxLength, MaxContractingDepth, M, N, placeholder, PortraitDepthUpperBound, contracting_depth, PermGroups, AreNotConjugateOnLevel,
         ConjugatorEvenFirstLevel, nucleus_distinct_level, N_perms, N_masks, ExtendPortrait, PrunePortrait, ContractingPortrait, ConjugatorPortrait, 
 		ConjugatorPortraitRecursive, TestConjugatorPortrait, size, g_len, r_len, result, TestConjugacyRelationships, recoveringL1, IntersectionOfTuples, L, extended_children,
 		ExtendedPortrait, pruned_children, PortraitToMaskBoundaryNonuniform, PermutationOfNestedPortrait, WreathToPortrait, portrait, i, ith_portrait,
 		FindAllConjugators, AssignNucleusElements, NucleusElementByPermutation, PortraitToNucleusByPermutation;
+
+	N_LETTERS := DegreeOfTree(G);
+
 	# Finds maximum level at which elements of length <= len contract to nucleus
 	MaxContractingDepth := function(len)
 		local level, elements, elem_depths;
@@ -337,7 +338,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 			local sigma_r, sigma_gs, related_r_sections, set_of_related_r_sections, i, new_g_list, new_h_list, g_h_index,
 				sigma_g, sections_of_r, lhs, g, h, next, rhs, portrait_of_r_i,
 				cycle_member, number_recovered, h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation,
-				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, current_portrait_depth, j;
+				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, current_portrait_depth, j, section_index;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			#Print("On level ", level, " recovered sigma_r as ", sigma_r, "\n");
@@ -361,7 +362,8 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 			#Recover as many sections as needed and fill in the rest
 			sections_of_r := [];
 			for set_of_related_r_sections in related_r_sections do 
-				for i in set_of_related_r_sections do 
+				for section_index in [1..Length(set_of_related_r_sections)] do 
+                    i := set_of_related_r_sections[section_index];
 					#Attemptting to recover r_i
 					#Need new lists of conjugate pairs
 					new_g_list := [];
@@ -388,7 +390,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 					#Print("New hs: ", new_h_list, "\n");
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
-						if i = Length(set_of_related_r_sections) then 
+						if section_index = Length(set_of_related_r_sections) then 
 							#could not recover any section in this set
 							#Print("Failed to recover sections at level ", level, "\n");
 							return fail;
@@ -484,7 +486,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 end;
 
 
-
+G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)"); #Hanoi 3 Group
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 g_list := List([1..10], i -> Random(G));
 r := Random(G);

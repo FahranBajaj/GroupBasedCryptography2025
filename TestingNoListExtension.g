@@ -1,6 +1,7 @@
 LoadPackage("AutomGrp");
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
+# Returns true if list L contains no repeat elements 
 NoRepeats := function(L)
 	local i, j, no_repeats;
 
@@ -19,13 +20,14 @@ end;
 
 ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 
-	local N_LETTERS, nucleus, NucleusMaxLength, MaxContractingDepth, M, N, placeholder, PortraitDepthUpperBound, contracting_depth, PermGroups, AreNotConjugateOnLevel,
-        ConjugatorEvenFirstLevel, nucleus_distinct_level, N_perms, N_masks, ExtendPortrait, PrunePortrait, ContractingPortrait, ConjugatorPortrait, 
-		ConjugatorPortraitRecursive, TestConjugatorPortrait, size, g_len, r_len, result, TestConjugacyRelationships, recoveringL1, IntersectionOfTuples, L, extended_children,
-		ExtendedPortrait, pruned_children, PortraitToMaskBoundaryNonuniform, PermutationOfNestedPortrait, WreathToPortrait, portrait, i, ith_portrait,
-		FindAllConjugators, AssignNucleusElements, NucleusElementByPermutation, PortraitToNucleusByPermutation;
+	local N_LETTERS, nucleus, MaxContractingDepth, M, N, L, placeholder, 
+		PortraitDepthUpperBound, AreNotConjugateOnLevel, nucleus_distinct_level,
+		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
+		recoveringL1, IntersectionOfTuples, PortraitToMaskBoundaryNonuniform, 
+		PermutationOfNestedPortrait, WreathToPortrait, FindAllConjugators, 
+		AssignNucleusElements, PortraitToNucleusByPermutation;
 
-    N_LETTERS := DegreeOfTree(G);
+	N_LETTERS := DegreeOfTree(G);
 
 	# Finds maximum level at which elements of length <= len contract to nucleus
 	MaxContractingDepth := function(len)
@@ -84,15 +86,16 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 	end;
 
 	IntersectionOfTuples := function(g_t, h_t)
-		local ghConjugators, allConj, intersect, i;
+		local ghConjugators, allConj, i;
 
 		# getting tuples of g and h values
 		ghConjugators := FindAllConjugators(PermGroupOnLevel(G, 1), g_t[1], h_t[1]);
-
-		for i in [2..Length(g_t)] do
+		i := 2;
+		while Length(ghConjugators) > 1 and i <= Length(g_t) do
 			# all conjugators of a g/h pair
 			allConj := FindAllConjugators(PermGroupOnLevel(G, 1), g_t[i], h_t[i]);
 			ghConjugators := Intersection(ghConjugators, allConj);
+			i := i + 1;
 		od;
 		return ghConjugators;
 	end;
@@ -139,7 +142,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 						rhs := rhs * Section(h, current_index^sigma_r);
 						current_index := current_index^sigma_g;
 					od;
-					if AreNotConjugateOnLevel(lhs, rhs, 4) then
+					if AreNotConjugateOnLevel(lhs, rhs, 2) then
 						valid := false;
 						break;
 					fi;
@@ -225,8 +228,9 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 		return [PortraitToNucleusByPermutation(portrait)];
 	end;
 
+	#Modified from Arsalan
 	PrunePortrait := function(portrait)
-		local nucleus, nucleus_identified , prune ;
+		local nucleus, nucleus_identified, prune;
 
 		nucleus := List(GroupNucleus(G), x-> [x]) ; 
 		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
@@ -252,13 +256,9 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 
 	PortraitToMaskBoundaryNonuniform := function(portrait , depth_of_portrait)
 		local i , sections, lower_sections, top_level_permutation;
-		
-		#Print("Converting portrait to mask\n");
-		#Print("Portrait: ", portrait, "depth: ", depth_of_portrait, "\n");
 
 		if depth_of_portrait=0 then
 			if Length(portrait)=1 then
-				#Print("Base case. Returning ", portrait, "\n");
 				return portrait;
 			else
 				Error("PortraitToMaskBoundaryNonuniform: <depth_of_portrait> cannot be smaller than the depth of the portrait");
@@ -269,29 +269,24 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 
 
 		if Length(portrait)=1 then 
-			#Print("Length 1, returning ", Sections(portrait[1], 1), "\n");
 			return Sections(portrait[1], 1);
 		fi;
 
 		sections:=[];
 
 		for i in [1..N_LETTERS] do
-			#Print("Current portrait: ", portrait, ", current depth: ", depth_of_portrait, "\n");
-			#Print("i value: ", i, "\n");
-			#Print("Next call: ", portrait[i+1], ", ", depth_of_portrait-1, "\n");
 			lower_sections := PortraitToMaskBoundaryNonuniform(portrait[i+1],depth_of_portrait-1);
 			top_level_permutation := PermActionOnLevel(PermutationOfNestedPortrait(portrait[i+1], depth_of_portrait - 1), depth_of_portrait - 1, 1, N_LETTERS);
 			Append(sections, [TreeAutomorphism(lower_sections, top_level_permutation)]);
 		od;
-		#Print("Returning ", sections);
 		return sections;
 	end;
 
 	PermutationOfNestedPortrait := function(portrait, depth_of_portrait)
-		local i, perms, l, id_sections;
+		local i, perms, l;
 
 		if Length(portrait)=1 then 
-				return PermOnLevel(portrait[1], 1); 
+			return PermOnLevel(portrait[1], 1); 
 		fi;
 
 		if depth_of_portrait=1 then
@@ -326,18 +321,18 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 
 	#Recover portrait of secret conjugator
 	ConjugatorPortrait:=function( g_list, h_list, key_length )
-		local t, branch_count, odd_g_idxs, gh_extended, portrait, cportrait;
-		t := Runtime();
-		branch_count := 0;
+		local portrait, cportrait, ConjugatorPortraitRecursive, contracting_depth;
 		contracting_depth := PortraitDepthUpperBound(key_length);
 
 		# Recursively builds portrait of conjugator from lists of conjugate pairs
 		ConjugatorPortraitRecursive :=function( g_list, h_list, level)
 		
-			local sigma_r, sigma_gs, related_r_sections, set_of_related_r_sections, i, new_g_list, new_h_list, g_h_index,
-				sigma_g, sections_of_r, lhs, g, h, next, rhs, portrait_of_r_i,
-				cycle_member, number_recovered, h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation,
-				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, current_portrait_depth, j, section_index;
+			local sigma_r, sigma_gs, related_r_sections, set_of_related_r_sections, 
+				i, new_g_list, new_h_list, g_h_index, sigma_g, sections_of_r, 
+				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
+				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
+				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
+				current_portrait_depth, j, section_index;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			#Print("On level ", level, " recovered sigma_r as ", sigma_r, "\n");
@@ -562,7 +557,7 @@ RandomElement := function(len, group)
 end;
 
 
-G := AutomatonGroup("a=(1,1,1,1,1,1)(1, 4)(2, 5)(3, 6), b=(a,a,1,b,b,b), c=(a,1,a,c,c,c), d=(1,a,a,d,d,d)");
+G := AutomatonGroup("a=(1, 1, 1, 1)(1,2)(3,4), b=(a,c,a,c), c=(b,1,1,b)");
 G_LENS := [10, 100];
 R_LENS := [10, 100];
 LIST_SIZE := 50;
@@ -575,6 +570,8 @@ for g_len in G_LENS do
             gs := RandomElementList(g_len, G, LIST_SIZE);
             r := RandomElement(r_len, G);
             hs := List(gs, g -> r^-1*g*r);
+			#Print("Test case is set up!\n");
+			#Print("Group is ", G, "\n");
             recovered_portrait := ConjugatorPortrait(G, gs, hs, r_len, 2);
             if recovered_portrait <> fail then
                 if recovered_portrait <> AutomPortrait(r) then 

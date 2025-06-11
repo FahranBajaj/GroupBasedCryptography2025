@@ -18,10 +18,89 @@ NoRepeats := function(L)
 	return no_repeats;
 end;
 
-ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
+#Slightly modified from 2024 group
+RandomElementList := function(min_len, max_len, group, list_size)
+ 
+    local i , j, relations, rule, rules, rules_product, rules_equivalence, 
+		generators, family, randomelt, successors, gen, len, rws, letter_rep, 
+		starters, element_list;
 
-	local N_LETTERS, nucleus, MaxContractingDepth, M, N, L, placeholder, 
-		PortraitDepthUpperBound, AreNotConjugateOnLevel, nucleus_distinct_level,
+    element_list := [];
+   
+    AG_UseRewritingSystem(group);
+    relations := FindGroupRelations(group,2);
+
+    relations := Filtered(relations, x -> (Length(Word(x)) <= 3) ); 
+
+    if not relations = [] then
+	    AG_AddRelators(group, relations);
+    fi;
+
+    rws        := AG_RewritingSystem(group);
+    generators := GeneratorsOfMonoid(Image(rws!.mhom));
+ 
+    rules      := AG_RewritingSystemRules(group);
+    rules_product := [];
+    rules_equivalence := [];
+    family     := FamilyObj(Word(One(group)));
+
+    for rule in rules do
+	letter_rep := LetterRepAssocWord(rule[1]);
+	if Size(letter_rep) = 2 then
+		Add(rules_product, letter_rep);
+        elif Size(letter_rep) = 1 then
+		Add(rules_equivalence, [letter_rep[1], LetterRepAssocWord(rule[2])]);
+	fi;
+    od;
+
+    starters   := Set([1..Size(generators)]);
+    successors := List([1..Size(generators)], x -> Set([1..Size(generators)]) );
+   
+    # No generator can be followed by an element that will simplify the product 
+    for rule in rules_product do
+	RemoveSet(successors[rule[1]], rule[2]);
+    od;
+
+    # If two generators are equivalent, ignore one
+    for rule in rules_equivalence do
+	for i in [1..Size(successors)] do	
+		RemoveSet(successors[i], rule[1]);
+	od;
+	successors[rule[1]] := [];
+	RemoveSet(starters, rule[1]);
+    od;
+
+    for i in [1..list_size] do
+	    gen :=  Random(starters);
+	    randomelt := [gen];
+	 	len := Random([min_len..max_len]);
+
+	    for j in [2..len] do  
+		    gen := Random(successors[gen]);
+		    Add( randomelt, gen );
+	    od;
+
+	    # Changes from denoting generators/inverses as 1, 2, 3.. to 1, -1, 2, -2..
+	    randomelt := List( randomelt, x -> (-1)^(x + 1)*Ceil(Float(x/2)) );
+	    randomelt := List( randomelt, x -> Int(x) );
+
+	    randomelt := AssocWordByLetterRep(family, randomelt);
+	    randomelt := Representative(randomelt, One(group));
+
+	    Add(element_list, randomelt);
+    od;
+
+    return element_list;
+end;
+
+RandomElement := function(len, group)
+    return RandomElementList(len - 5, len + 5, group, 1)[1];
+end;
+
+ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_approx, epsilon)
+
+	local N_LETTERS, nucleus, MaxContractingDepth, M, ContractingDepthStatApprox, L,
+		placeholder, PortraitDepthUpperBound, AreNotConjugateOnLevel, nucleus_distinct_level,
 		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
 		recoveringL1, IntersectionOfTuples, PortraitToMaskBoundaryNonuniform, 
 		PermutationOfNestedPortrait, WreathToPortrait, FindAllConjugators, 
@@ -34,24 +113,46 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 		local level, elements, elem_depths;
 		AG_UseRewritingSystem(G);
 		AG_UpdateRewritingSystem(G, 2);
-
 		elements := ListOfElements(G, len);
 		elem_depths := List(elements, x -> AutomPortraitDepth(x));
 		level := Maximum(elem_depths);
 		return level;
 	end;
 
-	nucleus := GroupNucleus(G);
+	ContractingDepthStatApprox := function(N, r_length)
+		local gs, cd_UB, elements, elem_depths, ed, x_bar, differences, variance, sigma, g;
+		# N: sample size of elements with same length l(g), sigma: standard deviation, x_bar sample mean, epsilon: small
+		gs := RandomElementList(r_length, r_length, G, N);
+		N := N*1.0;
 
-	# Find maximum length of elements in the nucleus
-	M := Maximum(List(nucleus, x -> Length(Word(x))));
-	N := MaxContractingDepth(k*M);
+		elem_depths := [];
+			
+			for g in gs do
+				ed := AutomPortraitDepth(g);
+				Append(elem_depths, [ed]);
+			od;
+			
+			x_bar := Sum(elem_depths)/Length(elem_depths);
 
-	# Computes upper bound for portrait depth for an element in group G of length n
-	# uses max level at which elements of length <= k*M contract
+			differences := List(elem_depths, x -> (x-x_bar)^2);
+			variance := Sum(differences)/(Length(gs)-1);
+			sigma := Sqrt(variance*1.0);
+
+			# contracting depth with probability 1 - epsilon (from their paper)
+			cd_UB := Int(Ceil(x_bar + (Sqrt((N^(1/3)+1)/(epsilon*(N^(1/3)))) + Sqrt((N^(1/3)+1)/(epsilon*N)))*sigma));
+
+		return cd_UB;
+	end;
+
 	PortraitDepthUpperBound := function(n)
-		local a, len;
+		local M, N, a, len;
 
+		if use_statistical_approx then
+			return ContractingDepthStatApprox(100, r_length);
+		fi;
+
+		M := Maximum(List(nucleus, x -> Length(Word(x))));
+		N := MaxContractingDepth(k*M);
 		if n <= k*M then
 			return MaxContractingDepth(n);
 		fi;
@@ -60,8 +161,6 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 		len := Int(Ceil( Float( (k/k-1)*M ) ));
 		return N*a + MaxContractingDepth( len );
 	end;
-
-	placeholder := nucleus[1];
 
 	AreNotConjugateOnLevel:=function(a, b, max_level)
 		local perm_group, level;
@@ -191,6 +290,8 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 	end;
 
 	# Finds the level at which all elements of the nucleus differ in permutation
+	nucleus := GroupNucleus(G);
+	placeholder := nucleus[1];
 	nucleus_distinct_level := 1;
 	while true do	
 		L := List(nucleus, x -> PermOnLevel(x, nucleus_distinct_level));
@@ -390,7 +491,6 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
-
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 
@@ -418,7 +518,6 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k)
 							fi;
 						fi;
 					od;
-
 					while number_recovered < Length(set_of_related_r_sections) do
 						for index in new_r_sections do 
 							for g_h_index in elems_with_distinct_perms do 

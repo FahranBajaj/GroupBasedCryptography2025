@@ -242,7 +242,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 						rhs := rhs * Section(h, current_index^sigma_r);
 						current_index := current_index^sigma_g;
 					od;
-					if AreNotConjugateOnLevel(lhs, rhs, 2) then
+					if AreNotConjugateOnLevel(lhs, rhs, 8) then
 						valid := false;
 						break;
 					fi;
@@ -488,7 +488,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
 				if level < 6 then 
-					Print("Failed on level ", level, "\n");
+					#Print("Failed on level ", level, "\n");
 				fi;
 				return fail;
 			fi;
@@ -537,14 +537,14 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 					od;
 					if Length(new_g_list) = 0 then	
 						if level < 6 then 
-							Print("Failed on level ", level, "\n");
+							#Print("Failed on level ", level, "\n");
 						fi;	
 						return fail;
 					fi;
 					if level < 6 then 
-						Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
+						#Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
 						if level < 3 then 
-							Print("set_of_related_r_sections: ", set_of_related_r_sections, ", related_r_sections: ", related_r_sections, ", section_index: ", section_index, "\n");
+							#Print("set_of_related_r_sections: ", set_of_related_r_sections, ", related_r_sections: ", related_r_sections, ", section_index: ", section_index, "\n");
 						fi;
 					fi;
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
@@ -552,7 +552,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 						if section_index = Length(set_of_related_r_sections) then 
 							#could not recover any section in this set
 							if level < 6 then 
-								Print("Failed on level ", level, "\n");
+								#Print("Failed on level ", level, "\n");
 							fi;
 							return fail;
 						else 
@@ -561,7 +561,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 						fi;
 					fi;
 					if level < 4 then 
-						Print("mark 1\n");
+						#Print("mark 1\n");
 					fi;
 
 					#If we get here, we have the portrait of r_i.
@@ -579,12 +579,12 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 						fi;
 					od;
 					if level < 4 then 
-						Print("mark 2\n");
+						#Print("mark 2\n");
 					fi;
 					while number_recovered < Length(set_of_related_r_sections) do
 						for index in new_r_sections do 
 							if level < 4 then
-								Print("We are going to loop through ", elems_with_distinct_perms, "\n");
+								#Print("We are going to loop through ", elems_with_distinct_perms, "\n");
 							fi;
 							for g_h_index in elems_with_distinct_perms do 
 								g := g_list[g_h_index];
@@ -594,11 +594,11 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 								cycle_member := index^sigma_g;
 								h_index := index^sigma_r;
 								if level < 4 then 
-									Print("Computing new section...\n");
+									#Print("Computing new section...\n");
 								fi;
 								new_section := Section(g, index)^-1*sections_of_r[index]*Section(h, h_index);
 								if level < 4 then
-									Print("Done\n");
+									#Print("Done\n");
 								fi;
 								while cycle_member <> index do 
 									if not (IsBound(sections_of_r[cycle_member])) then
@@ -608,11 +608,11 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 									fi;
 									h_index := h_index^sigma_h;
 									if level < 4 then 
-										Print("Computing new section...\n");
+										#Print("Computing new section...\n");
 									fi;
 									new_section := Section(g, cycle_member)^-1 * new_section * Section(h, h_index);
 									if level < 4 then
-										Print("Done\n");
+										#Print("Done\n");
 									fi;
 									cycle_member := cycle_member^sigma_g;	
 									if number_recovered = Length(set_of_related_r_sections) then 
@@ -631,7 +631,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 						newer_r_sections := [];
 					od;
 					if level < 4 then 
-						Print("mark 3\n");
+						#Print("mark 3\n");
 					fi;
 					#got all sections in this set, move onto the next one
 					break;
@@ -642,7 +642,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 			#as well as all of the sections. The last thing we need to do is convert
 			#these back into a portrait and return.
 			if level < 6 then 
-				Print("Returning from level ", level, "\n");
+				#Print("Returning from level ", level, "\n");
 			fi;
 			return WreathToPortrait(sections_of_r, sigma_r, current_portrait_depth + 1);
 
@@ -665,17 +665,167 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 end;
 
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
-G := AutomatonGroup("a=(1,1,1,1,1,1)(1,4)(2, 5)(3, 6), b=(a,a,1,b,b,b), c=(a,1,a,c,c,c), d=(1,a,a,d,d,d)");
-G_LENS := [100];
-R_LENS := [100];
+
+RandomWordInGenerators := function(len, num_generators)
+    local choicesOfGenerators;
+    choicesOfGenerators := List([1..len], i -> Random([1..num_generators]));
+    return choicesOfGenerators;
+end;
+
+G := AutomatonGroup("a = (1, 1)(1, 2), b = (a, c), c = (b, 1)");
+CONJUGATOR_LIFTING_DICTIONARY := NewDictionary([1, 1], true);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [1, 1], [2]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [2, 1], [3]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [3, 1], [1, 2, 1]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [1, 2], [1, 2, 1]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [2, 2], [1, 3, 1]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [3, 2], [2]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [0, 1], [0]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [0, 2], [0]);
+
+
+NextLevelConjugator := function(wordOfElement, sectionNumber)
+    local newGeneratorIndices, i;
+    newGeneratorIndices := [];
+
+    for i in wordOfElement do 
+        Append(newGeneratorIndices, LookupDictionary(CONJUGATOR_LIFTING_DICTIONARY, [i, sectionNumber]));
+    od;
+    return newGeneratorIndices;
+end;
+
+ProductOfPieces := function(pieces)
+    local product, piece, conjugatorWord, conjugator, generator, commutatorWord,
+         commutator;
+    product := One(G);
+    for piece in pieces do 
+        conjugatorWord := piece[1];
+        conjugator := One(G);
+        for generator in conjugatorWord do
+            if generator = 0 then
+                conjugator := conjugator * One(G);
+            elif generator = 1 then 
+                conjugator := conjugator * a;
+            elif generator = 2 then 
+                conjugator := conjugator * b;
+            else
+                conjugator := conjugator * c;
+            fi;
+        od;
+        product := product*conjugator^-1;
+        commutatorWord := piece[2];
+        for commutator in commutatorWord do 
+            if commutator = 0 then
+                product := product * One(G);
+            elif commutator = 1 then 
+                product := product * (a*b)^2;
+            else 
+                product := product * (b*c)^2;
+            fi;
+        od;
+        product := product * conjugator;
+    od;
+    return product;
+end;
+
+#Computes random stabilizers of the nth level for the iterated monodromy
+#group for z^2 + i
+RandomStabilizerIMGZMostlyId := function(level, innerWordLength, conjugatorLength)
+    local current_level, stabilizers_of_level, i, conjugator, innerWord, stabilizers_of_next_level,
+        pointer, pieces_of_next_stabilizer, section1, piece, newConjugator, 
+        commutator, section2;
+    current_level := 0;
+    stabilizers_of_level := [];
+    for i in [1..2^level] do 
+        if i = 1 then
+            conjugator := RandomWordInGenerators(conjugatorLength, 3);
+            innerWord := RandomWordInGenerators(innerWordLength, 2);
+            Append(stabilizers_of_level, [[[conjugator, innerWord]]]);
+        else
+            Append(stabilizers_of_level, [[[[0],[0]]]]);
+        fi;
+    od;
+
+    while current_level < level do 
+        stabilizers_of_next_level := [];
+        pointer := 1;
+        while pointer < Length(stabilizers_of_level) do 
+            pieces_of_next_stabilizer := [];
+            section1 := stabilizers_of_level[pointer];
+            for piece in section1 do 
+                newConjugator := NextLevelConjugator(piece[1], 1);
+
+                for commutator in piece[2] do
+                    if commutator = 0 then
+                        Append(pieces_of_next_stabilizer, [[newConjugator, [0]]]);
+                    elif commutator = 1 then 
+                        Append(pieces_of_next_stabilizer, [[newConjugator, [2]]]);
+                    else 
+                        Append(pieces_of_next_stabilizer, [[Concatenation([1, 2, 3], newConjugator), [1]]]);
+                        Append(pieces_of_next_stabilizer, [[Concatenation([2], newConjugator), [2]]]);
+                        Append(pieces_of_next_stabilizer, [[Concatenation([1], newConjugator), [1]]]);
+                    fi;
+                od;
+            od;
+            pointer := pointer + 1;
+            section2 := stabilizers_of_level[pointer];
+            for piece in section2 do 
+                newConjugator := NextLevelConjugator(piece[1], 2);
+                for commutator in piece[2] do 
+                    if commutator = 0 then
+                        Append(pieces_of_next_stabilizer, [[newConjugator, [0]]]);
+                    elif commutator = 1 then 
+                        Append(pieces_of_next_stabilizer, [[Concatenation([1], newConjugator), [2]]]);
+                    else 
+                        Append(pieces_of_next_stabilizer, [[Concatenation([1, 2, 3], [1], newConjugator), [1]]]);
+                        Append(pieces_of_next_stabilizer, [[Concatenation([2], [1], newConjugator), [2]]]);
+                        Append(pieces_of_next_stabilizer, [[Concatenation([1], [1], newConjugator), [1]]]);
+                    fi;
+                od;
+            od;
+            Append(stabilizers_of_next_level, [pieces_of_next_stabilizer]);
+            pointer := pointer + 1;
+        od;
+        current_level := current_level + 1;
+        stabilizers_of_level := stabilizers_of_next_level;
+        stabilizers_of_next_level := [];
+    od;
+    return ProductOfPieces(stabilizers_of_level[1]);
+end;
+
+GroupActionOnLevel := function(level)
+    return function(point, g)
+        return point^PermOnLevel(g, level);
+    end;
+end;
+ 
+ElemMappingAToBOnLevel := function(G, a, b, level)
+    local action;
+    action := GroupActionOnLevel(level);
+    return RepresentativeAction(G, a, b, action);
+end;
+
+RandomStabilizerIMGZ := function(level, innerWordLength, conjugatorLength)
+    local liftedSections, product, conjugator, i;
+    liftedSections := List([1..2^level], i -> RandomStabilizerIMGZMostlyId(level, innerWordLength, conjugatorLength));
+    product := liftedSections[1];
+    for i in [2..2^level] do
+        conjugator := ElemMappingAToBOnLevel(G, 1, i, level);
+        product := product * liftedSections[i]^conjugator;
+    od;
+    return product;
+end;
+
+G_LENS := [5, 20, 50];
+R_LENS := [10, 50, 100];
 LIST_SIZE := 50;
-TRIALS := 100;
+TRIALS := 20;
 
 for g_len in G_LENS do
     for r_len in R_LENS do 
         number_recovered := 0;
         for trial in [1..TRIALS] do
-            gs := RandomElementList(g_len-5, g_len + 5, G, LIST_SIZE);
+            gs := List([1..LIST_SIZE], i -> RandomStabilizerIMGZ(2, g_len, g_len));
             r := RandomElement(r_len, G);
             hs := List(gs, g -> r^-1*g*r);
 			#Print("Set up example. First g: ", gs[1], ", r: ", r, "\n");

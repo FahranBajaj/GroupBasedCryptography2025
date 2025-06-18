@@ -1,4 +1,3 @@
-
 # the function take two protraits p1 and p2 and the degree of the tree as input
 
 PortraitProduct := function(p1 , p2 , degree)

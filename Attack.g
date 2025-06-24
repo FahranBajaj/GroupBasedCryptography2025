@@ -354,8 +354,11 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 		return prune(portrait);
 	end;
 
-	PortraitProduct := function(p1, p2)
+	PortraitProduct := function(p1, p2, cache)
 		local product ;
+		if KnowsDictionary(cache, [p1, p2]) then 
+			return LookupDictionary(cache, [p1, p2]);
+		fi;
 		product := function(portrait_1, portrait_2)
 			if not IsPerm(portrait_1[1]) and not IsPerm(portrait_2[1]) then
 				return AutomPortrait(portrait_1[1]*portrait_2[1]) ;
@@ -437,7 +440,8 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
-				current_portrait_depth, j, section_index, portrait_of_r;
+				current_portrait_depth, j, section_index, portrait_of_r, multiplicationCache,
+				g_inv_port, h_port, first_prod;
 
 			if Length(g_list) = 0 then 
 				return fail;
@@ -506,6 +510,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 					new_r_sections := [i];
 					newer_r_sections := [];
 					number_recovered := 1;
+					multiplicationCache := NewDictionary([portrait_of_r_i, portrait_of_r_i], true);
 					while number_recovered < Length(set_of_related_r_sections) do
 						for index in new_r_sections do 
 							for g_h_index in elems_with_distinct_perms do 
@@ -516,7 +521,12 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 								cycle_member := index^sigma_g;
 								h_index := index^sigma_r;
 								#g_{index}^-1 * r_{index} * h_{index}
-								new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, index))), sections_of_r[index]), AutomPortrait(Section(h, h_index)));
+								g_inv_port := PortraitInverse(AutomPortrait(Section(g, index)));
+								h_port := AutomPortrait(Section(h, h_index));
+								first_prod := PortraitProduct(g_inv_port, sections_of_r[index], multiplicationCache);
+								AddDictionary(multiplicationCache, [g_inv_port, sections_of_r[index]], first_prod);
+								new_section := PortraitProduct(first_prod, h_port, multiplicationCache);
+								AddDictionary(multiplicationCache, [new_section, h_port], new_section);
 								while cycle_member <> index do 
 									if not (IsBound(sections_of_r[cycle_member])) then
 										sections_of_r[cycle_member] := new_section;
@@ -525,7 +535,12 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 									fi;
 									h_index := h_index^sigma_h;
 									#g_{cycle_member}^-1 * new_section * h_{h_index}
-									new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, cycle_member))), new_section), AutomPortrait(Section(h, h_index)));
+									g_inv_port := PortraitInverse(AutomPortrait(Section(g, cycle_member)));
+									h_port := AutomPortrait(Section(h, h_index));
+									first_prod := PortraitProduct(g_inv_port, new_section, multiplicationCache);
+									AddDictionary(multiplicationCache, [g_inv_port, new_section], first_prod);
+									new_section := PortraitProduct(first_prod, h_port, multiplicationCache);
+									AddDictionary(multiplicationCache, [first_prod, h_port], new_section);
 									cycle_member := cycle_member^sigma_g;	
 									if number_recovered = Length(set_of_related_r_sections) then 
 										break;
@@ -559,7 +574,6 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 		if portrait = fail then 
 			return fail;
 		fi;
-		Print("Expected portrait depth: ", contracting_depth + nucleus_distinct_level, "\n");
 		cportrait := AssignNucleusElements(portrait, contracting_depth + nucleus_distinct_level);
 		cportrait := PrunePortrait(cportrait);
 		return cportrait;
@@ -570,6 +584,8 @@ end;
 
 #A simplified example
 G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)"); #Hanoi 3 Group
+AG_UseRewritingSystem(G);
+AG_UpdateRewritingSystem(G, 2);
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 g_list := List([1..10], i -> Random(G));
 r := Random(G);

@@ -98,58 +98,42 @@ RandomElement := function(len, group)
     return RandomElementList(len - 5, len + 5, group, 1)[1];
 end;
 
+Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
+
 RandomWordInGenerators := function(len, num_generators)
     local choicesOfGenerators;
     choicesOfGenerators := List([1..len], i -> Random([1..num_generators]));
     return choicesOfGenerators;
-    
-    #wordFunction := function(generators)
-    #    factors := [];
-    #    for i in [1..len] do
-    #        if inverses[i] then 
-    #            factor := generators[choicesOfGenerators[i]]^-1;
-    #        else 
-    #            factor := generators[choicesOfGenerators[i]];
-    #        fi;
-    #    od;
-    #    return Product(factors);
-    #end;
-    #return wordFunction;
 end;
 
 G := AutomatonGroup("a = (1, 1)(1, 2), b = (a, c), c = (b, 1)");
-CONJUGATOR_LIFTING_DICTIONARY := NewDictionary([1, 1], true);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [1, 1], [2]);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [2, 1], [3]);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [3, 1], [1, 2, 1]);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [1, 2], [1, 2, 1]);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [2, 2], [1, 3, 1]);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [3, 2], [2]);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [0, 1], [0]);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, [0, 2], [0]);
 
+#Self-replicating equations:
+#b = (a, c), c = (b, 1), aba = (c, a), aca = (1, b)
+CONJUGATOR_LIFTING_DICTIONARY := NewDictionary(1, true);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, 1, [2]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, 2, [3]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, 3, [1, 2, 1]);
 
-NextLevelConjugator := function(wordOfElement, sectionNumber)
+NextLevelConjugator := function(wordOfElement)
     local newGeneratorIndices, i;
     newGeneratorIndices := [];
 
     for i in wordOfElement do 
-        Append(newGeneratorIndices, LookupDictionary(CONJUGATOR_LIFTING_DICTIONARY, [i, sectionNumber]));
+        Append(newGeneratorIndices, LookupDictionary(CONJUGATOR_LIFTING_DICTIONARY, i));
     od;
     return newGeneratorIndices;
 end;
 
 ProductOfPieces := function(pieces)
-    local product, piece, conjugatorWord, conjugator, generator, commutatorWord,
-         commutator;
+    local product, piece, conjugatorWord, conjugator, generator, commutator;
     product := One(G);
     for piece in pieces do 
-        conjugatorWord := piece[1];
+		#piece = [generator, conjugator]
+        conjugatorWord := piece[2];
         conjugator := One(G);
         for generator in conjugatorWord do
-            if generator = 0 then
-                conjugator := conjugator * One(G);
-            elif generator = 1 then 
+            if generator = 1 then 
                 conjugator := conjugator * a;
             elif generator = 2 then 
                 conjugator := conjugator * b;
@@ -158,84 +142,48 @@ ProductOfPieces := function(pieces)
             fi;
         od;
         product := product*conjugator^-1;
-        commutatorWord := piece[2];
-        for commutator in commutatorWord do 
-            if commutator = 0 then
-                product := product * One(G);
-            elif commutator = 1 then 
-                product := product * (a*b)^2;
-            else 
-                product := product * (b*c)^2;
-            fi;
-        od;
+        commutator := piece[1];
+		if commutator = 1 then 
+			product := product * (a*b)^2;
+		else 
+			product := product * (b*c)^2;
+		fi;
         product := product * conjugator;
     od;
     return product;
 end;
 
 #Computes random stabilizers of the nth level for the iterated monodromy
-#group for z^2 + i
-RandomStabilizerIMGZ := function(level, innerWordLength, conjugatorLength)
-    local current_level, stabilizers_of_level, i, conjugator, innerWord, stabilizers_of_next_level,
-        pointer, pieces_of_next_stabilizer, section1, piece, newConjugator, 
-        commutator, section2;
-    current_level := 0;
-    stabilizers_of_level := [];
-    for i in [1..2^level] do 
-        if i = 1 then
-            conjugator := RandomWordInGenerators(conjugatorLength, 3);
-            innerWord := RandomWordInGenerators(innerWordLength, 2);
-            Append(stabilizers_of_level, [[[conjugator, innerWord]]]);
-        else
-            Append(stabilizers_of_level, [[[[0],[0]]]]);
-        fi;
-    od;
+#group for z^2 + i. All sections at nth level are identity except first one.
 
-    while current_level < level do 
-        stabilizers_of_next_level := [];
-        pointer := 1;
-        while pointer < Length(stabilizers_of_level) do 
-            pieces_of_next_stabilizer := [];
-            section1 := stabilizers_of_level[pointer];
-            for piece in section1 do 
-                newConjugator := NextLevelConjugator(piece[1], 1);
-
-                for commutator in piece[2] do
-                    if commutator = 0 then
-                        Append(pieces_of_next_stabilizer, [[newConjugator, [0]]]);
-                    elif commutator = 1 then 
-                        Append(pieces_of_next_stabilizer, [[newConjugator, [2]]]);
-                    else 
-                        Append(pieces_of_next_stabilizer, [[Concatenation([1, 2, 3], newConjugator), [1]]]);
-                        Append(pieces_of_next_stabilizer, [[Concatenation([2], newConjugator), [2]]]);
-                        Append(pieces_of_next_stabilizer, [[Concatenation([1], newConjugator), [1]]]);
-                    fi;
-                od;
-            od;
-            pointer := pointer + 1;
-            section2 := stabilizers_of_level[pointer];
-            for piece in section2 do 
-                newConjugator := NextLevelConjugator(piece[1], 2);
-                for commutator in piece[2] do 
-                    if commutator = 0 then
-                        Append(pieces_of_next_stabilizer, [[newConjugator, [0]]]);
-                    elif commutator = 1 then 
-                        Append(pieces_of_next_stabilizer, [[Concatenation([1], newConjugator), [2]]]);
-                    else 
-                        Append(pieces_of_next_stabilizer, [[Concatenation([1, 2, 3], [1], newConjugator), [1]]]);
-                        Append(pieces_of_next_stabilizer, [[Concatenation([2], [1], newConjugator), [2]]]);
-                        Append(pieces_of_next_stabilizer, [[Concatenation([1], [1], newConjugator), [1]]]);
-                    fi;
-                od;
-            od;
-            Append(stabilizers_of_next_level, [pieces_of_next_stabilizer]);
-            pointer := pointer + 1;
-        od;
-        current_level := current_level + 1;
-        stabilizers_of_level := stabilizers_of_next_level;
-        stabilizers_of_next_level := [];
-    od;
-    return ProductOfPieces(stabilizers_of_level[1]);
+#Lifting equations: [b, c] = ([a, b], 1), 
+#[a, b]^{abc}[b, c]^b[a, b]^a = [c, b^a] = ([b, c], 1)
+RandomStabilizerIMGZMostlyId := function(level, innerWordLength, conjugatorLength)
+	local current_level, current_element, lifted_element, piece, newConjugator,
+		commutator;
+	current_level := 0;
+	#Represent an element of N by list of [generator, conjugator] factors
+	#Where each conjugator is a list of numbers representing generators
+	current_element := List([1..innerWordLength], i -> [Random([1..2]), RandomWordInGenerators(conjugatorLength, 3)]);
+	while current_level < level do 
+		lifted_element := [];
+		for piece in current_element do 
+			#piece = [generator, conjugator]
+			newConjugator := NextLevelConjugator(piece[2]);
+			commutator := piece[1];
+			if commutator = 1 then 
+            	Append(lifted_element, [[2, newConjugator]]);
+			else 
+				Append(lifted_element, [[1, Concatenation([1, 2, 3], newConjugator)]]);
+				Append(lifted_element, [[2, Concatenation([2], newConjugator)]]);
+				Append(lifted_element, [[1, Concatenation([1], newConjugator)]]);
+			fi;
+		od;
+		
+		current_element := lifted_element;
+		current_level := current_level + 1;
+	od;
+	return ProductOfPieces(current_element);
 end;
 
 GroupActionOnLevel := function(level)
@@ -250,4 +198,13 @@ ElemMappingAToBOnLevel := function(G, a, b, level)
     return RepresentativeAction(G, a, b, action);
 end;
 
-treeAut := RandomStabilizerIMGZ(4,5,4);
+RandomStabilizerIMGZ := function(level, innerWordLength, conjugatorLength)
+    local liftedSections, product, conjugator, i;
+    liftedSections := List([1..2^level], i -> RandomStabilizerIMGZMostlyId(level, innerWordLength, conjugatorLength));
+    product := liftedSections[1];
+    for i in [2..2^level] do
+        conjugator := ElemMappingAToBOnLevel(G, 1, i, level);
+        product := product * liftedSections[i]^conjugator;
+    od;
+    return product;
+end;

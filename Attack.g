@@ -97,14 +97,16 @@ RandomElement := function(len, group)
     return RandomElementList(len - 5, len + 5, group, 1)[1];
 end;
 
-ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_approx, epsilon)
+
+ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_approx, epsilon,
+								extended_word_length, num_new_pairs)
 
 	local N_LETTERS, nucleus, MaxContractingDepth, M, ContractingDepthStatApprox, L,
 		placeholder, PortraitDepthUpperBound, AreNotConjugateOnLevel, nucleus_distinct_level,
 		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
 		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
 		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
-		PortraitToNucleusByPermutation, ElemsWithDistinctPerms;
+		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation;
 
 	N_LETTERS := DegreeOfTree(G);
 
@@ -354,11 +356,8 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 		return prune(portrait);
 	end;
 
-	PortraitProduct := function(p1, p2, cache)
+	PortraitProduct := function(p1, p2)
 		local product ;
-		if KnowsDictionary(cache, [p1, p2]) then 
-			return LookupDictionary(cache, [p1, p2]);
-		fi;
 		product := function(portrait_1, portrait_2)
 			if not IsPerm(portrait_1[1]) and not IsPerm(portrait_2[1]) then
 				return AutomPortrait(portrait_1[1]*portrait_2[1]) ;
@@ -426,10 +425,28 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 		od;
 		return indices_to_return;
 	end;
+	
+	ElemWithPermutation := function(g_s, h_s, sigma)
+		local G, H, permGroup, F, FGenerators, FToPerm, FToG, FToH, sigmaInF, g, h;
+		G := Group(g_s);
+		H := Group(h_s);
+		permGroup := PermGroupOnLevel(G, 1);
+		F := FreeGroup(Length(g_s));
+		FGenerators := GeneratorsOfGroup(F);
+		FToPerm := GroupHomomorphismByImagesNC(F, permGroup, FGenerators, List(g_s, g -> PermOnLevel(g, 1)));
+		FToG := GroupHomomorphismByImagesNC(F, G, FGenerators, g_s);
+		FToH := GroupHomomorphismByImagesNC(F, H, FGenerators, h_s);
+		sigmaInF := PreImagesRepresentative(FToPerm, sigma);
+		g := FToG(sigmaInF);
+		h := FToH(sigmaInF);
+		return [g, h];
+	end;
 
 	#Recover portrait of secret conjugator
-	ConjugatorPortrait:=function( g_list, h_list, key_length )
-		local portrait, cportrait, ConjugatorPortraitRecursive, contracting_depth;
+	ConjugatorPortrait:=function(short_g_list, short_h_list, key_length )
+		local portrait, cportrait, ConjugatorPortraitRecursive, contracting_depth,
+			gs_hs_to_multiply, new_g_list, new_h_list, i, idxs, gs, hs;
+
 		contracting_depth := PortraitDepthUpperBound(key_length);
 
 		# Recursively builds portrait of conjugator from lists of conjugate pairs
@@ -440,12 +457,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
-				current_portrait_depth, j, section_index, portrait_of_r, multiplicationCache,
-				g_inv_port, h_port, first_prod;
-
-			if Length(g_list) = 0 then 
-				return fail;
-			fi;
+				current_portrait_depth, j, section_index;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
@@ -494,6 +506,9 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
+					if Length(new_g_list) = 0 then	
+						return fail;
+					fi;
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 
@@ -506,11 +521,11 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 					fi;
 
 					#If we get here, we have the portrait of r_i.
+					#We need to express this as a tree automorphism to compute the other relevant sections.
 					sections_of_r[i] := portrait_of_r_i;
 					new_r_sections := [i];
 					newer_r_sections := [];
 					number_recovered := 1;
-					multiplicationCache := NewDictionary([portrait_of_r_i, portrait_of_r_i], true);
 					while number_recovered < Length(set_of_related_r_sections) do
 						for index in new_r_sections do 
 							for g_h_index in elems_with_distinct_perms do 
@@ -566,9 +581,26 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 			portrait_of_r := Concatenation([sigma_r], sections_of_r);
 			return portrait_of_r;
 
-		end; # End of ConjugatorPortraitRecursive	
+		end; #End of ConjugatorPortraitRecursive
 
-		portrait := ConjugatorPortraitRecursive(g_list, h_list, 1);
+		new_g_list := [];	
+		new_h_list := [];	
+
+		for i in [1..num_new_pairs] do
+			idxs := List( [1..extended_word_length], x -> Random([1..Size(short_g_list)]) );
+			gs := List(idxs, x -> short_g_list[x]);
+			hs := List(idxs, x -> short_h_list[x]);
+			Add(new_g_list, Product(gs));
+			Add(new_h_list, Product(hs));	
+		od;
+
+		gs_hs_to_multiply := List(new_g_list, g -> ElemWithPermutation(short_g_list, short_h_list, PermOnLevel(g, 1)^-1));
+		new_g_list := List([1..Length(new_g_list)], i -> new_g_list[i]*gs_hs_to_multiply[i][1]);
+		new_h_list := List([1..Length(new_h_list)], i -> new_h_list[i]*gs_hs_to_multiply[i][2]);
+		Append(new_g_list, short_g_list);
+		Append(new_h_list, short_h_list);
+
+		portrait := ConjugatorPortraitRecursive(new_g_list, new_h_list, 1);
 		if portrait = fail then 
 			return fail;
 		fi;
@@ -588,8 +620,7 @@ Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 g_list := List([1..10], i -> Random(G));
 r := Random(G);
 h_list := List(g_list, g -> r^-1*g*r);
-final := ConjugatorPortrait(G, g_list, h_list, 20, 2, false, 1); #r is probably not of length more than 20
-#Print(final, "\n");
+final := ConjugatorPortrait(G, g_list, h_list, 20, 2, false, 1, 3, 50); #r is probably not of length more than 20
 Print("r: ", r, "\n");
 Print("Portrait of r: ", AutomPortrait(r), "\n");
 Print("Portrait we found: ", final, "\n");

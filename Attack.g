@@ -520,31 +520,29 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 								sigma_h := PermOnLevel(h, 1);
 								cycle_member := index^sigma_g;
 								h_index := index^sigma_r;
-								#g_{index}^-1 * r_{index} * h_{index}
-								g_inv_port := PortraitInverse(AutomPortrait(Section(g, index)));
-								h_port := AutomPortrait(Section(h, h_index));
-								first_prod := PortraitProduct(g_inv_port, sections_of_r[index], multiplicationCache);
-								AddDictionary(multiplicationCache, [g_inv_port, sections_of_r[index]], first_prod);
-								new_section := PortraitProduct(first_prod, h_port, multiplicationCache);
-								AddDictionary(multiplicationCache, [new_section, h_port], new_section);
+								#g_{index}^-1 * r_{index} * h_{h_index}
+								if not (IsBound(sections_of_r[cycle_member])) then 
+									new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, index))), sections_of_r[index]), AutomPortrait(Section(h, h_index)));
+								else 
+									new_section := sections_of_r[cycle_member];
+								fi;
 								while cycle_member <> index do 
 									if not (IsBound(sections_of_r[cycle_member])) then
 										sections_of_r[cycle_member] := new_section;
 										number_recovered := number_recovered + 1;
+										if number_recovered = Length(set_of_related_r_sections) then 
+											break;
+										fi;
 										Append(newer_r_sections, [cycle_member]);
 									fi;
 									h_index := h_index^sigma_h;
 									#g_{cycle_member}^-1 * new_section * h_{h_index}
-									g_inv_port := PortraitInverse(AutomPortrait(Section(g, cycle_member)));
-									h_port := AutomPortrait(Section(h, h_index));
-									first_prod := PortraitProduct(g_inv_port, new_section, multiplicationCache);
-									AddDictionary(multiplicationCache, [g_inv_port, new_section], first_prod);
-									new_section := PortraitProduct(first_prod, h_port, multiplicationCache);
-									AddDictionary(multiplicationCache, [first_prod, h_port], new_section);
-									cycle_member := cycle_member^sigma_g;	
-									if number_recovered = Length(set_of_related_r_sections) then 
-										break;
+									if not (IsBound(sections_of_r[cycle_member^sigma_g])) then 
+										new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, cycle_member))), new_section), AutomPortrait(Section(h, h_index)));
+									else 
+										new_section := sections_of_r[cycle_member^sigma_g];
 									fi;
+									cycle_member := cycle_member^sigma_g;	
 								od;
 								if number_recovered = Length(set_of_related_r_sections) then 
 									break;

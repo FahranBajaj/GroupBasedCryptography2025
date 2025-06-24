@@ -101,10 +101,10 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 
 	local N_LETTERS, nucleus, MaxContractingDepth, M, ContractingDepthStatApprox, L,
 		placeholder, PortraitDepthUpperBound, AreNotConjugateOnLevel, nucleus_distinct_level,
-		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, PortraitToWreath,
-		recoveringL1, IntersectionOfTuples, SectionsAsAutomorphisms, portraitToWreathCache, 
-		wreathToPortraitCache, PermutationOfNestedPortrait, WreathToPortrait, FindAllConjugators, 
-		AssignNucleusElements, PortraitToNucleusByPermutation, ElemsWithDistinctPerms;
+		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
+		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
+		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
+		PortraitToNucleusByPermutation, ElemsWithDistinctPerms;
 
 	N_LETTERS := DegreeOfTree(G);
 
@@ -183,7 +183,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 		return Elements(RightCoset(centralizer, r));
 	end;
 
-	IntersectionOfTuples := function(g_t, h_t)
+	IntersectionOfConjugators := function(g_t, h_t)
 		local sigma_g, sigma_h, ghConjugators, allConj, i;
 
 		# getting tuples of g and h values
@@ -263,7 +263,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 		local possibleRs, i, sigma_g, fixed_points;
 
 		#Get possible sigma_r by looking at permutations that could conjugate all sigma_g/sigma_h pairs
-		possibleRs := IntersectionOfTuples(g_t, h_t);
+		possibleRs := IntersectionOfConjugators(g_t, h_t);
 
 		if Length(possibleRs) = 1 then
 			return possibleRs[1];
@@ -354,42 +354,37 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 		return prune(portrait);
 	end;
 
-	portraitToWreathCache := NewDictionary(AutomPortrait(g_list[1]), true);
-	wreathToPortraitCache := NewDictionary([PermOnLevel(g_list[1], 1), Sections(g_list[1], 1), 1], true);
-
-	SectionsAsAutomorphisms := function(portrait, depth_of_portrait)
-		local i , sections, lower_sections, top_level_permutation, wreath;
-
-		if depth_of_portrait=0 then
-			if Length(portrait)=1 then
-				return portrait;
-			else
-				Error("SectionsAsAutomorphisms: <depth_of_portrait> cannot be smaller than the depth of the portrait");
+	PortraitProduct := function(p1, p2)
+		local product ;
+		product := function(portrait_1, portrait_2)
+			if not IsPerm(portrait_1[1]) and not IsPerm(portrait_2[1]) then
+				return AutomPortrait(portrait_1[1]*portrait_2[1]) ;
 			fi;
-		elif depth_of_portrait = 1 then 
-			return List([1..N_LETTERS], i -> portrait[i+1][1]);
-		fi;
+			if IsPerm(portrait_1[1]) and IsPerm(portrait_2[1]) then
+				return Concatenation([portrait_1[1]*portrait_2[1]], List([1..N_LETTERS], k->product(portrait_1[k+1] , portrait_2[k^(portrait_1[1])+1])));
+			fi;
+			if not IsPerm(portrait_1[1]) and IsPerm(portrait_2[1]) then
+				return product(Concatenation([Perm(portrait_1[1])],List(Sections(portrait_1[1]),x->[x])),portrait_2);
+			fi;
+			if not IsPerm(portrait_2[1]) and IsPerm(portrait_1[1]) then
+				return product(portrait_1,Concatenation([Perm(portrait_2[1])],List(Sections(portrait_2[1]),x->[x])));	
+			fi;
+		end;
+		return product(p1,p2) ;
+	end;
 
-		if KnowsDictionary(portraitToWreathCache, portrait) then	
-			return LookupDictionary(portraitToWreathCache, portrait);
-		fi;
-
-
-		if Length(portrait)=1 then 
-			return Sections(portrait[1], 1);
-		fi;
-
-		sections:=[];
-
-		for i in [1..N_LETTERS] do
-			lower_sections := SectionsAsAutomorphisms(portrait[i+1],depth_of_portrait-1);
-			top_level_permutation := PermActionOnLevel(PermutationOfNestedPortrait(portrait[i+1], depth_of_portrait - 1), depth_of_portrait - 1, 1, N_LETTERS);
-			wreath := TreeAutomorphism(lower_sections, top_level_permutation);
-			Append(sections, [wreath]);
-			AddDictionary(portraitToWreathCache, portrait, wreath);
-			AddDictionary(wreathToPortraitCache, [lower_sections, top_level_permutation, depth_of_portrait], portrait);
-		od;
-		return sections;
+	PortraitInverse := function(p)
+		local inverse ;
+		inverse := function(portrait)
+			local k ;
+			if not IsPerm (portrait[1]) then 
+				return [portrait[1]^-1] ; 
+			fi;
+			if IsPerm(portrait[1]) then 
+				return Concatenation([portrait[1]^-1], List([1..N_LETTERS], x-> inverse(portrait[x^(portrait[1]^-1)+1]) ) );
+			fi;
+		end;
+		return inverse(p) ;
 	end;
 
 	PermutationOfNestedPortrait := function(portrait, depth_of_portrait)
@@ -413,47 +408,6 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 			od;
 
 		return PermList(l);
-	end;
-
-	PortraitToWreath := function(portrait, current_portrait_depth)
-		local r_i_permutation, r_i_sections, wreath;
-
-		if KnowsDictionary(portraitToWreathCache, portrait) then	
-			return LookupDictionary(portraitToWreathCache, portrait);
-		fi;
-
-		if Length(portrait) = 1 then
-			r_i_permutation := PermOnLevel(portrait[1], 1); 
-		else 
-			r_i_permutation := portrait[1];
-		fi;
-		
-		r_i_sections := SectionsAsAutomorphisms(portrait, current_portrait_depth);
-		wreath := TreeAutomorphism(r_i_sections, r_i_permutation);
-		AddDictionary(portraitToWreathCache, portrait, wreath);
-		AddDictionary(wreathToPortraitCache, [r_i_sections, r_i_permutation, current_portrait_depth], portrait);
-		return wreath;
-	end;
-
-	WreathToPortrait := function(sections, permutation, depth_for_portrait)
-		local i, ith_portrait, portrait;
-		if depth_for_portrait = 0 then 
-			return [placeholder];
-		fi;
-
-		if KnowsDictionary(wreathToPortraitCache, [sections, permutation, depth_for_portrait]) then	
-			return LookupDictionary(wreathToPortraitCache, [sections, permutation, depth_for_portrait]);
-		fi;
-
-		portrait := [permutation];
-		for i in [1..N_LETTERS] do 
-			ith_portrait := WreathToPortrait(Sections(sections[i], 1), PermOnLevel(sections[i], 1), depth_for_portrait - 1);
-			Append(portrait, [ith_portrait]);
-		od;
-
-		AddDictionary(portraitToWreathCache, portrait, TreeAutomorphism(sections, permutation));
-		AddDictionary(wreathToPortraitCache, [sections, permutation, depth_for_portrait], portrait);
-		return portrait;
 	end;
 
 	ElemsWithDistinctPerms := function(elems)
@@ -483,7 +437,11 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
-				current_portrait_depth, j, section_index;
+				current_portrait_depth, j, section_index, portrait_of_r;
+
+			if Length(g_list) = 0 then 
+				return fail;
+			fi;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
@@ -532,9 +490,6 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
-					if Length(new_g_list) = 0 then	
-						return fail;
-					fi;
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 
@@ -547,19 +502,10 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 					fi;
 
 					#If we get here, we have the portrait of r_i.
-					#We need to express this as a tree automorphism to compute the other relevant sections.
-					r_i := PortraitToWreath(portrait_of_r_i, current_portrait_depth);
-					sections_of_r[i] := r_i;
+					sections_of_r[i] := portrait_of_r_i;
 					new_r_sections := [i];
 					newer_r_sections := [];
-					number_recovered := 0;
-					for j in [1..Length(sections_of_r)] do 
-						if IsBound(sections_of_r[j]) then 
-							if j in set_of_related_r_sections then 
-								number_recovered := number_recovered + 1;
-							fi;
-						fi;
-					od;
+					number_recovered := 1;
 					while number_recovered < Length(set_of_related_r_sections) do
 						for index in new_r_sections do 
 							for g_h_index in elems_with_distinct_perms do 
@@ -569,7 +515,8 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 								sigma_h := PermOnLevel(h, 1);
 								cycle_member := index^sigma_g;
 								h_index := index^sigma_r;
-								new_section := Section(g, index)^-1*sections_of_r[index]*Section(h, h_index);
+								#g_{index}^-1 * r_{index} * h_{index}
+								new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, index))), sections_of_r[index]), AutomPortrait(Section(h, h_index)));
 								while cycle_member <> index do 
 									if not (IsBound(sections_of_r[cycle_member])) then
 										sections_of_r[cycle_member] := new_section;
@@ -577,7 +524,8 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 										Append(newer_r_sections, [cycle_member]);
 									fi;
 									h_index := h_index^sigma_h;
-									new_section := Section(g, cycle_member)^-1 * new_section * Section(h, h_index);
+									#g_{cycle_member}^-1 * new_section * h_{h_index}
+									new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, cycle_member))), new_section), AutomPortrait(Section(h, h_index)));
 									cycle_member := cycle_member^sigma_g;	
 									if number_recovered = Length(set_of_related_r_sections) then 
 										break;
@@ -602,7 +550,8 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 			#If we get this far, we have recovered the action of r on the first level  
 			#as well as all of the sections. The last thing we need to do is convert
 			#these back into a portrait and return.
-			return WreathToPortrait(sections_of_r, sigma_r, current_portrait_depth + 1);
+			portrait_of_r := Concatenation([sigma_r], sections_of_r);
+			return portrait_of_r;
 
 		end; # End of ConjugatorPortraitRecursive	
 
@@ -610,6 +559,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 		if portrait = fail then 
 			return fail;
 		fi;
+		Print("Expected portrait depth: ", contracting_depth + nucleus_distinct_level, "\n");
 		cportrait := AssignNucleusElements(portrait, contracting_depth + nucleus_distinct_level);
 		cportrait := PrunePortrait(cportrait);
 		return cportrait;
@@ -624,8 +574,9 @@ Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 g_list := List([1..10], i -> Random(G));
 r := Random(G);
 h_list := List(g_list, g -> r^-1*g*r);
-final := ConjugatorPortrait(G, g_list, h_list, 20, 2); #r is probably not of length more than 20
-Print(final, "\n");
-if final <> fail then 	
-	Print(final = AutomPortrait(r), "\n");
-fi;
+final := ConjugatorPortrait(G, g_list, h_list, 20, 2, false, 1); #r is probably not of length more than 20
+#Print(final, "\n");
+Print("r: ", r, "\n");
+Print("Portrait of r: ", AutomPortrait(r), "\n");
+Print("Portrait we found: ", final, "\n");
+Print("Correct? ", AutomPortrait(r) = final, "\n");

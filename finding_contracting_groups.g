@@ -1,7 +1,8 @@
 # todo:
     # figure out good stopping point for nucleus depth
     # ways other than brute force to rule out random groups?
-
+LoadPackage("AutomGrp");
+Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 new_autom_gr := function(T_d, numGenerators, oneProb)
     # T_d: d-ary tree, numGenerators: <= 20,
 
@@ -53,8 +54,8 @@ end;
 
 # Print(new_autom_gr(6,4));
 
-contracting_groups := function(T_d, numGenerators, numTries, nucleusDepth, oneProb)
-    # T_d: d-ary tree, numGenerators: <= 20, nucleusDepth: where to quit, numTries: how many groups to generate
+contracting_groups := function(T_d, numGenerators, numTries, maxNucleusSize, oneProb)
+    # T_d: d-ary tree, numGenerators: <= 20, maxNucleusSize: where to quit, numTries: how many groups to generate
     # oneProb: Probability of a section being 1
     local aut_groups, G, nucleus, c_groups;
 
@@ -62,16 +63,16 @@ contracting_groups := function(T_d, numGenerators, numTries, nucleusDepth, onePr
     c_groups := [];
 
     for G in aut_groups do
-        nucleus := FindNucleus(G, nucleusDepth, false);
+        nucleus := FindNucleus(G, maxNucleusSize, false);
         Print("*");
 
         if nucleus <> fail then
             # contracting! yay!
             Append(c_groups, [G]);
-            Print("\n", G, " is contracting!\n");
+            #Print("\n", G, " is contracting!\n");
 
         else
-            Print("\n", G, " is not contracting\n");
+            #Print("\n", G, " is not contracting\n");
         fi;
     od;
 
@@ -82,14 +83,11 @@ contracting_groups := function(T_d, numGenerators, numTries, nucleusDepth, onePr
     return c_groups;
 end;
 
-cgs := contracting_groups(10,4,10,20,0.75);
+cgs := contracting_groups(3,5,20,30,0.75);
 Print("\n\nCONTRACTING GROUPS:");
 
 for i in [1..Length(cgs)] do
-    Print("\n\n", i, ". ", cgs[i]);
+    Print("\n\n", i, ". ", cgs[i], "\n");
+    Print("Nucleus size: ", Size(GroupNucleus(cgs[i])), "\n");
 od;
-    return c_groups;
-end;
-
-cgs := contracting_groups(4,3,150,20,false);
-Print("\n", cgs);
+quit;

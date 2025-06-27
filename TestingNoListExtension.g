@@ -63,7 +63,7 @@ RandomElementList := function(min_len, max_len, group, list_size)
 
     # If two generators are equivalent, ignore one
     for rule in rules_equivalence do
-	for i in [1..Size(successors)] do	
+	for i in [1..Size(successors)] do
 		RemoveSet(successors[i], rule[1]);
 	od;
 	successors[rule[1]] := [];
@@ -425,7 +425,7 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 	end;
 
 	#Recover portrait of secret conjugator
-	ConjugatorPortrait:=function( g_list, h_list, key_length )
+	ConjugatorPortrait:=function( g_list, h_list, key_length)
 		local portrait, cportrait, ConjugatorPortraitRecursive, contracting_depth;
 		contracting_depth := PortraitDepthUpperBound(key_length);
 
@@ -437,12 +437,11 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
-				current_portrait_depth, j, section_index;
+				current_portrait_depth, j, section_index, portrait_of_r;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
 				if level < 6 then 
-					#Print("Failed on level ", level, "\n");
 				fi;
 				return fail;
 			fi;
@@ -491,12 +490,10 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 					od;
 					if Length(new_g_list) = 0 then	
 						if level < 6 then 
-							#Print("Failed on level ", level, "\n");
 						fi;	
 						return fail;
 					fi;
 					if level < 6 then 
-						#Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
 						if level < 3 then 
 							#Print("set_of_related_r_sections: ", set_of_related_r_sections, ", related_r_sections: ", related_r_sections, ", section_index: ", section_index, "\n");
 						fi;
@@ -618,9 +615,9 @@ ConjugatorPortrait := function(G, g_list, h_list, r_length, k, use_statistical_a
 end;
 
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
-G := AutomatonGroup("a=(1,1,1,1,1,1)(1,4)(2, 5)(3, 6), b=(a,a,1,b,b,b), c=(a,1,a,c,c,c), d=(1,a,a,d,d,d)");
-G_LENS := [100];
-R_LENS := [100];
+G := AutomatonGroup("a = (1, 1, 1)(1,3), b = (1, 1, d)(1,3,2), d = (1, 1, b), e = (b, 1, 1)(2,3)");
+G_LENS := [10, 50, 100];
+R_LENS := [10, 50, 100];
 LIST_SIZES := [50];
 TRIALS := 10;
 
@@ -648,16 +645,16 @@ for list_size in LIST_SIZES do
 				gs := RandomElementList(g_len, g_len, G, list_size);
 				r := RandomElement(r_len, G);
 				hs := List(gs, g -> r^-1*g*r);
-				#Print("Set up example. First g: ", gs[1], ", r: ", r, "\n");
+				Print("Set up example. First g: ", gs[1], ", r: ", r, "\n");
 				#Print("First g in this trial: ", gs[1], "\n");
-				recovered_portrait := ConjugatorPortrait(G, gs, hs, r_len + 5, 2, false, 0.1);
+				recovered_portrait := ConjugatorPortrait(G, gs, hs, r_len + 5, 2, true, 0.1);
 				if recovered_portrait <> fail then
 					if recovered_portrait <> AutomPortrait(r) then 
 						Print("Recovered the incorrect portrait for:\nlist of gs: ", gs, "\nlist of hs: ", hs, "\nr: ", r, "\n");
 					fi;
 					number_recovered := number_recovered + 1;
 				fi;
-				#Print("After ", trial, " trials, we have recovered ", number_recovered, " portraits. Runtime so far: ", Runtime(), ", average runtime per trial: ", Runtime() / trial, "\n");
+				Print("After ", trial, " trials, we have recovered ", number_recovered, " portraits. Runtime so far: ", Runtime(), ", average runtime per trial: ", Runtime() / trial, "\n");
 			od;
 			Print("For g_len ", g_len, ", r_len ", r_len, ", list_size ", list_size, ", we recovered ", number_recovered, " out of ", TRIALS, " portraits.\n");
 		od;

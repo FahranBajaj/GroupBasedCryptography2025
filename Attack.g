@@ -97,7 +97,6 @@ RandomElement := function(len, group)
     return RandomElementList(len - 5, len + 5, group, 1)[1];
 end;
 
-
 ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_approx, epsilon,
 								extended_word_length, num_new_pairs)
 
@@ -106,7 +105,8 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
 		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
 		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
-		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation;
+		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation,
+		PruneSingleLevel;
 
 	N_LETTERS := DegreeOfTree(G);
 
@@ -323,6 +323,9 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	#given portrait with a bunch of placeholders, replace with nucleus elements
 	AssignNucleusElements := function(portrait, portrait_depth)
 		#unwrap layers of portrait that are not necessarily nucleus elements
+		if Length(portrait) = 1 then 
+			return portrait;
+		fi;
 		if portrait_depth > nucleus_distinct_level then
 			return Concatenation([portrait[1]], List([1..N_LETTERS], i -> AssignNucleusElements(portrait[i+1], portrait_depth - 1)));
 		fi;
@@ -344,6 +347,31 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 				return p ;
 			else 
 				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1]))) ;
+				for i in [1..Length(nucleus_identified)] do 
+						if p_int = nucleus_identified[i][2] then
+							return nucleus_identified[i][1];
+						fi;
+					od;
+				return p_int ;
+			fi;
+		end;
+
+		return prune(portrait);
+	end;
+
+	PruneSingleLevel := function(portrait)
+		local nucleus, nucleus_identified, prune;
+
+		nucleus := List(GroupNucleus(G), x-> [x]) ; 
+		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
+
+		prune := function(p) 
+			local p_int , i ; 
+			p_int := [] ;
+			if p in nucleus then 
+				return p ;
+			else 
+				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> p[x+1])) ;
 				for i in [1..Length(nucleus_identified)] do 
 						if p_int = nucleus_identified[i][2] then
 							return nucleus_identified[i][1];
@@ -444,10 +472,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 	#Recover portrait of secret conjugator
 	ConjugatorPortrait:=function(short_g_list, short_h_list, key_length )
-		local portrait, cportrait, ConjugatorPortraitRecursive, contracting_depth,
+		local portrait, ConjugatorPortraitRecursive, contracting_depth,
 			gs_hs_to_multiply, new_g_list, new_h_list, i, idxs, gs, hs;
 
 		contracting_depth := PortraitDepthUpperBound(key_length);
+		Print("Contracting depth is: ", contracting_depth, "\n");
+		Print("Nucleus distinct level is: ", nucleus_distinct_level, "\n");
 
 		# Recursively builds portrait of conjugator from lists of conjugate pairs
 		ConjugatorPortraitRecursive :=function(g_list, h_list, level)
@@ -457,7 +487,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
-				current_portrait_depth, j, section_index;
+				current_portrait_depth, j, section_index, portrait_of_r;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
@@ -466,7 +496,11 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 			current_portrait_depth := contracting_depth + nucleus_distinct_level - level;
 			if current_portrait_depth = 0 then
-				return Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])); 
+				portrait_of_r :=  Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])); 
+				if nucleus_distinct_level = 1 then 
+					portrait_of_r := AssignNucleusElements(portrait_of_r, 1);
+				fi;
+				return portrait_of_r;
 			fi;
 
 			#If we get to this point, we know how r acts on the first level
@@ -538,6 +572,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 								#g_{index}^-1 * r_{index} * h_{h_index}
 								if not (IsBound(sections_of_r[cycle_member])) then 
 									new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, index))), sections_of_r[index]), AutomPortrait(Section(h, h_index)));
+									if level <= contracting_depth then 
+										new_section := AssignNucleusElements(new_section, current_portrait_depth);
+									fi;
+									if level < contracting_depth then 
+										new_section := PrunePortrait(new_section);
+									fi;
 								else 
 									new_section := sections_of_r[cycle_member];
 								fi;
@@ -554,6 +594,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 									#g_{cycle_member}^-1 * new_section * h_{h_index}
 									if not (IsBound(sections_of_r[cycle_member^sigma_g])) then 
 										new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, cycle_member))), new_section), AutomPortrait(Section(h, h_index)));
+										if level <= contracting_depth then 
+											new_section := AssignNucleusElements(new_section, current_portrait_depth);
+										fi;
+										if level < contracting_depth then 
+											new_section := PrunePortrait(new_section);
+										fi;
 									else 
 										new_section := sections_of_r[cycle_member^sigma_g];
 									fi;
@@ -579,6 +625,11 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			#as well as all of the sections. The last thing we need to do is convert
 			#these back into a portrait and return.
 			portrait_of_r := Concatenation([sigma_r], sections_of_r);
+			if level = contracting_depth + 1 then 
+				portrait_of_r := AssignNucleusElements(portrait_of_r, nucleus_distinct_level);
+			elif level < contracting_depth + 1 then 
+				portrait_of_r := PruneSingleLevel(portrait_of_r);
+			fi;
 			return portrait_of_r;
 
 		end; #End of ConjugatorPortraitRecursive
@@ -604,10 +655,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		if portrait = fail then 
 			return fail;
 		fi;
-		cportrait := AssignNucleusElements(portrait, contracting_depth + nucleus_distinct_level);
-		cportrait := PrunePortrait(cportrait);
-		return cportrait;
-
+		return portrait;
 	end; # End of ConjugatorPortrait
 	return ConjugatorPortrait(g_list, h_list, r_length);
 end;

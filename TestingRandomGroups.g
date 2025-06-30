@@ -1,15 +1,6 @@
 LoadPackage("AutomGrp");
+Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 CONJUGATION_ACTION := OnPoints; # action is conjugation
-totalTime := 0;
-timePruning := 0;
-timeAssigning := 0;
-timeMultiplying := 0;
-timeSCSPSymGroup := 0;
-timeRecoveringL1 := 0;
-timeTestingConjugacies := 0;
-timeNewSystems := 0;
-timeSettingUp := 0;
-timeSectionFromSection := 0;
 
 # Returns true if list L contains no repeat elements 
 NoRepeats := function(L)
@@ -73,7 +64,7 @@ RandomElementList := function(min_len, max_len, group, list_size)
 
     # If two generators are equivalent, ignore one
     for rule in rules_equivalence do
-	for i in [1..Size(successors)] do	
+	for i in [1..Size(successors)] do
 		RemoveSet(successors[i], rule[1]);
 	od;
 	successors[rule[1]] := [];
@@ -107,6 +98,7 @@ RandomElement := function(len, group)
     return RandomElementList(len - 5, len + 5, group, 1)[1];
 end;
 
+
 ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_approx, epsilon,
 								extended_word_length, num_new_pairs)
 
@@ -115,11 +107,8 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
 		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
 		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
-		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation,
-		PruneSingleLevel;
+		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation;
 
-	totalTime := totalTime - Runtime();
-	timeSettingUp := timeSettingUp - Runtime();
 	N_LETTERS := DegreeOfTree(G);
 
 	# Finds maximum level at which elements of length <= len contract to nucleus
@@ -138,25 +127,28 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		local gs, cd_UB, elements, elem_depths, ed, x_bar, differences, variance, sigma, g;
 		# N: sample size of elements with same length l(g), sigma: standard deviation, x_bar sample mean, epsilon: small
 		gs := RandomElementList(r_length, r_length, G, N);
+        Print("Found the random elements\n");
 		N := N*1.0;
 
 		elem_depths := [];
 			
-			for g in gs do
-				ed := AutomPortraitDepth(g);
-				Append(elem_depths, [ed]);
-			od;
-			
-			x_bar := Sum(elem_depths)/Length(elem_depths);
+        i := 0;
+        for g in gs do
+            ed := AutomPortraitDepth(g);
+            i := i + 1;
+            Print("Done with ", i, "elements.\n");
+            Append(elem_depths, [ed]);
+        od;
+        
+        x_bar := Sum(elem_depths)/Length(elem_depths);
+        differences := List(elem_depths, x -> (x-x_bar)^2);
+        variance := Sum(differences)/(Length(gs)-1);
+        sigma := Sqrt(variance*1.0);
 
-			differences := List(elem_depths, x -> (x-x_bar)^2);
-			variance := Sum(differences)/(Length(gs)-1);
-			sigma := Sqrt(variance*1.0);
+        # contracting depth with probability 1 - epsilon (from their paper)
+        cd_UB := Int(Ceil(x_bar + (Sqrt((N^(1/3)+1)/(epsilon*(N^(1/3)))) + Sqrt((N^(1/3)+1)/(epsilon*N)))*sigma));
 
-			# contracting depth with probability 1 - epsilon (from their paper)
-			cd_UB := Int(Ceil(x_bar + (Sqrt((N^(1/3)+1)/(epsilon*(N^(1/3)))) + Sqrt((N^(1/3)+1)/(epsilon*N)))*sigma));
-
-		return cd_UB;
+		return [elem_depths, cd_UB];
 	end;
 
 	PortraitDepthUpperBound := function(n)
@@ -277,13 +269,9 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		local possibleRs, i, sigma_g, fixed_points;
 
 		#Get possible sigma_r by looking at permutations that could conjugate all sigma_g/sigma_h pairs
-		timeRecoveringL1 := timeRecoveringL1 - Runtime();
-		timeSCSPSymGroup := timeSCSPSymGroup - Runtime();
 		possibleRs := IntersectionOfConjugators(g_t, h_t);
-		timeSCSPSymGroup := timeSCSPSymGroup + Runtime();
 
 		if Length(possibleRs) = 1 then
-			timeRecoveringL1 := timeRecoveringL1 + Runtime();
 			return possibleRs[1];
 		else
 			#Narrow down possibilities for sigma_r by looking at conjugacy relationships between sections
@@ -295,19 +283,16 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 						SubtractSet(fixed_points, MovedPoints(sigma_g));
 					fi;
 				if fixed_points > 1 or Maximum(CycleStructurePerm(sigma_g)) > 1 then 
-					timeTestingConjugacies := timeTestingConjugacies - Runtime();
 					possibleRs := TestConjugacyRelationships(g_t[i], h_t[i], possibleRs);
-					timeTestingConjugacies := timeTestingConjugacies + Runtime();
 				fi;
 				i := i + 1;
 			od;
 			if Length(possibleRs) = 1 then 
-				timeRecoveringL1 := timeRecoveringL1 + Runtime();
 				return possibleRs[1];
 			else
-				timeRecoveringL1 := timeRecoveringL1 + Runtime();
 				return fail;
 			fi;
+
 		fi;
 	end;
 
@@ -342,27 +327,16 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	#given portrait with a bunch of placeholders, replace with nucleus elements
 	AssignNucleusElements := function(portrait, portrait_depth)
 		#unwrap layers of portrait that are not necessarily nucleus elements
-		local p;
-		timeAssigning := timeAssigning - Runtime();
-		if Length(portrait) = 1 then 
-			timeAssigning := timeAssigning + Runtime();
-			return portrait;
-		fi;
 		if portrait_depth > nucleus_distinct_level then
-			p := Concatenation([portrait[1]], List([1..N_LETTERS], i -> AssignNucleusElements(portrait[i+1], portrait_depth - 1)));
-			timeAssigning := timeAssigning + Runtime();
-			return p;
+			return Concatenation([portrait[1]], List([1..N_LETTERS], i -> AssignNucleusElements(portrait[i+1], portrait_depth - 1)));
 		fi;
 
-		p := [PortraitToNucleusByPermutation(portrait)];
-		timeAssigning := timeAssigning + Runtime();
-		return p;
+		return [PortraitToNucleusByPermutation(portrait)];
 	end;
 
 	#Modified from Arsalan
 	PrunePortrait := function(portrait)
-		local nucleus, nucleus_identified, prune, p;
-		timePruning := timePruning - Runtime();
+		local nucleus, nucleus_identified, prune;
 
 		nucleus := List(GroupNucleus(G), x-> [x]) ; 
 		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
@@ -382,41 +356,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 				return p_int ;
 			fi;
 		end;
-		p := prune(portrait);
-		timePruning := timePruning + Runtime();
-		return p;
-	end;
 
-	PruneSingleLevel := function(portrait)
-		local nucleus, nucleus_identified, prune, p;
-
-		timePruning := timePruning - Runtime();
-		nucleus := List(GroupNucleus(G), x-> [x]) ; 
-		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
-
-		prune := function(p) 
-			local p_int , i ; 
-			p_int := [] ;
-			if p in nucleus then 
-				return p ;
-			else 
-				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> p[x+1])) ;
-				for i in [1..Length(nucleus_identified)] do 
-						if p_int = nucleus_identified[i][2] then
-							return nucleus_identified[i][1];
-						fi;
-					od;
-				return p_int ;
-			fi;
-		end;
-
-		p := prune(portrait);
-		timePruning := timePruning + Runtime();
-		return p;
+		return prune(portrait);
 	end;
 
 	PortraitProduct := function(p1, p2)
-		local product;
+		local product ;
 		product := function(portrait_1, portrait_2)
 			if not IsPerm(portrait_1[1]) and not IsPerm(portrait_2[1]) then
 				return AutomPortrait(portrait_1[1]*portrait_2[1]) ;
@@ -431,7 +376,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 				return product(portrait_1,Concatenation([Perm(portrait_2[1])],List(Sections(portrait_2[1]),x->[x])));	
 			fi;
 		end;
-		return product(p1, p2);
+		return product(p1,p2) ;
 	end;
 
 	PortraitInverse := function(p)
@@ -503,8 +448,8 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 	#Recover portrait of secret conjugator
 	ConjugatorPortrait:=function(short_g_list, short_h_list, key_length )
-		local portrait, ConjugatorPortraitRecursive, contracting_depth,
-			gs_hs_to_multiply, new_g_list, new_h_list, i, idxs, gs, hs;
+		local portrait, cportrait, ConjugatorPortraitRecursive, contracting_depth,
+			gs_hs_to_multiply, new_g_list, new_h_list, i, idxs, gs, hs, portrait_of_r;
 
 		contracting_depth := PortraitDepthUpperBound(key_length);
 
@@ -516,7 +461,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
-				current_portrait_depth, j, section_index, portrait_of_r;
+				current_portrait_depth, j, section_index;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
@@ -525,11 +470,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 			current_portrait_depth := contracting_depth + nucleus_distinct_level - level;
 			if current_portrait_depth = 0 then
-				portrait_of_r :=  Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])); 
-				if nucleus_distinct_level = 1 then 
-					portrait_of_r := AssignNucleusElements(portrait_of_r, 1);
-				fi;
-				return portrait_of_r;
+				return Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])); 
 			fi;
 
 			#If we get to this point, we know how r acts on the first level
@@ -547,7 +488,6 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
                     i := set_of_related_r_sections[section_index];
 					#Attemptting to recover r_i
 					#Need new lists of conjugate pairs
-					timeNewSystems := timeNewSystems - Runtime();
 					new_g_list := [];
 					new_h_list := [];
 					for g_h_index in [1..Size(g_list)] do 
@@ -573,7 +513,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 					if Length(new_g_list) = 0 then	
 						return fail;
 					fi;
-					timeNewSystems := timeNewSystems + Runtime();
+                    Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 
@@ -587,7 +527,6 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 					#If we get here, we have the portrait of r_i.
 					#We need to express this as a tree automorphism to compute the other relevant sections.
-					timeSectionFromSection := timeSectionFromSection - Runtime();
 					sections_of_r[i] := portrait_of_r_i;
 					new_r_sections := [i];
 					newer_r_sections := [];
@@ -603,15 +542,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 								h_index := index^sigma_r;
 								#g_{index}^-1 * r_{index} * h_{h_index}
 								if not (IsBound(sections_of_r[cycle_member])) then 
-									timeMultiplying := timeMultiplying - Runtime();
 									new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, index))), sections_of_r[index]), AutomPortrait(Section(h, h_index)));
-									timeMultiplying := timeMultiplying + Runtime();
-									if level <= contracting_depth then 
-										new_section := AssignNucleusElements(new_section, current_portrait_depth);
-									fi;
-									if level < contracting_depth then 
-										new_section := PrunePortrait(new_section);
-									fi;
 								else 
 									new_section := sections_of_r[cycle_member];
 								fi;
@@ -627,15 +558,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 									h_index := h_index^sigma_h;
 									#g_{cycle_member}^-1 * new_section * h_{h_index}
 									if not (IsBound(sections_of_r[cycle_member^sigma_g])) then 
-										timeMultiplying := timeMultiplying - Runtime();
 										new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, cycle_member))), new_section), AutomPortrait(Section(h, h_index)));
-										timeMultiplying := timeMultiplying + Runtime();
-										if level <= contracting_depth then 
-											new_section := AssignNucleusElements(new_section, current_portrait_depth);
-										fi;
-										if level < contracting_depth then 
-											new_section := PrunePortrait(new_section);
-										fi;
 									else 
 										new_section := sections_of_r[cycle_member^sigma_g];
 									fi;
@@ -653,7 +576,6 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 						newer_r_sections := [];
 					od;
 					#got all sections in this set, move onto the next one
-					timeSectionFromSection := timeSectionFromSection + Runtime();
 					break;
 				od;
 			od;
@@ -662,11 +584,6 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			#as well as all of the sections. The last thing we need to do is convert
 			#these back into a portrait and return.
 			portrait_of_r := Concatenation([sigma_r], sections_of_r);
-			if level = contracting_depth + 1 then 
-				portrait_of_r := AssignNucleusElements(portrait_of_r, nucleus_distinct_level);
-			elif level < contracting_depth + 1 then 
-				portrait_of_r := PruneSingleLevel(portrait_of_r);
-			fi;
 			return portrait_of_r;
 
 		end; #End of ConjugatorPortraitRecursive
@@ -688,64 +605,129 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		Append(new_g_list, short_g_list);
 		Append(new_h_list, short_h_list);
 
-		timeSettingUp := timeSettingUp + Runtime();
 		portrait := ConjugatorPortraitRecursive(new_g_list, new_h_list, 1);
-		totalTime := totalTime + Runtime();
 		if portrait = fail then 
 			return fail;
 		fi;
-		return portrait;
+		cportrait := AssignNucleusElements(portrait, contracting_depth + nucleus_distinct_level);
+		cportrait := PrunePortrait(cportrait);
+		return cportrait;
+
 	end; # End of ConjugatorPortrait
 	return ConjugatorPortrait(g_list, h_list, r_length);
 end;
 
+new_autom_gr := function(T_d, numGenerators, oneProb)
+    # T_d: d-ary tree, numGenerators: <= 40,
 
-Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
-G := AutomatonGroup("a=(1,1,1,1,1,1)(1,4)(2, 5)(3, 6), b=(a,a,1,b,b,b), c=(a,1,a,c,c,c), d=(1,a,a,d,d,d)");
-G_LENS := [10, 50];
-R_LENS := [10, 50];
+    local possible_gens, sections, S_d, identity, weightedSections, num1s, numOtherGen, currentGen, i, j, myGens, currentAut;
+
+    # ex: AutomatonGroup([ [ 1, 2, ()], [ 1, 2, (1,2) ] ], [ "a", "b" ]); (a=1, b=2, etc)
+    # setup for a new automaton group
+    possible_gens := ["1", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t"]; # deal with 1!
+
+    S_d := SymmetricGroup(T_d);
+
+    sections := [];
+    identity := [];
+    Append(identity, List([1..T_d], x -> 1));
+    Append(identity, [One(S_d)]);
+    Append(sections, [identity]);
+
+    # getting correct probability of 1s
+    weightedSections := [];
+    num1s := Int(oneProb*1000.0);
+    numOtherGen := Int((1-oneProb)*1000.0/(numGenerators*1.0));
+
+    Append(weightedSections, List([1..num1s], x -> 1));
+    for i in [2..(numGenerators + 1)] do
+        Append(weightedSections, List([1..numOtherGen], x -> i));
+    od;
+
+    # making lists
+    for i in [2..(numGenerators+1)] do  # make some generators! skipping identity
+        currentGen := [];
+
+        for j in [1..T_d] do  # make some sections!
+            # OLD: Append(currentGen, [Random([1..(numGenerators+1)])]);   # CHANGE THIS TO USE PROBABILITY!
+            Append(currentGen, [Random(weightedSections)]);
+        od;
+
+        Append(currentGen, [Random(Elements(S_d))]);  # appending random permutation!
+        Append(sections, [currentGen]);
+    od;
+
+    # getting generators
+    myGens := List([1..(numGenerators+1)], i -> possible_gens[i]);
+
+    # new automaton group!
+    currentAut := AutomatonGroup(sections, myGens);
+    
+    return currentAut;
+end;
+
+RandomContractingGroup := function(T_d, numGenerators, maxNucleusSize, oneProb)
+    # T_d: d-ary tree, numGenerators: <= 20, maxNucleusSize: where to quit, numTries: how many groups to generate
+    # oneProb: Probability of a section being 1
+    local candidateGroup, nucleus;
+
+    while true do 
+        candidateGroup := new_autom_gr(T_d, numGenerators, oneProb);
+        nucleus := FindNucleus(candidateGroup, maxNucleusSize, false);
+        if nucleus <> fail then 
+            return candidateGroup;
+        fi;
+    od;
+end;
+
+G_LENS := [10];
+R_LENS := [50];
 LIST_SIZES := [50];
-TRIALS := 1;
+DIFFERENT_GROUPS := 20;
+ONE_PROBS := [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3];
+TRIALS := 10;
+MAX_NUCLEUS_SIZE := 30;
+TREE_SIZES := [5];
+NUM_GENERATORS := [4];
 
+f := OutputTextFile("random_group_success_data.csv", true);
+#header: g_len,r_len,list_size,tree_size,one_prob,num_generators,max_nucleus_size,nucleus_size,trials,number_recovered
+
+#placeholder for global variable
+G := AutomatonGroup("a = (1)");
 for list_size in LIST_SIZES do
 	for g_len in G_LENS do
 		for r_len in R_LENS do 
-			number_recovered := 0;
-			for trial in [1..TRIALS] do
-				gs := RandomElementList(g_len-5, g_len + 5, G, list_size);
-				r := RandomElement(r_len, G);
-				hs := List(gs, g -> r^-1*g*r);
-				#Print("Set up example. First g: ", gs[1], ", r: ", r, "\n");
-				recovered_portrait := ConjugatorPortrait(G, gs, hs, r_len + 5, 2, false, 0.1, 0, 0);
-				if recovered_portrait <> fail then
-					if recovered_portrait <> AutomPortrait(r) then 
-						Print("Recovered the incorrect portrait for:\nlist of gs: ", gs, "\nlist of hs: ", hs, "\nr: ", r, "\n");
-					fi;
-					number_recovered := number_recovered + 1;
-				fi;
-				#Print("After ", trial, " trials, we have recovered ", number_recovered, " portraits.\n");
-			od;
-			Print("For g_len ", g_len, ", r_len ", r_len, ", list_size ", list_size, ", we recovered ", number_recovered, " out of ", TRIALS, " portraits.\n");
-            Print("total time: ", totalTime, "\n");
-			Print("time pruning: ", timePruning, "\n");
-			Print("time assigning: ", timeAssigning, "\n");
-			Print("time multiplying: ", timeMultiplying, "\n");
-			Print("time recovering L1: ", timeRecoveringL1, "\n");
-			Print("time section from section: ", timeSectionFromSection, "\n");
-			Print("time setting up: ", timeSettingUp, "\n");
-			Print("time new systems: ", timeNewSystems, "\n");
-			Print("Time in intersecton of conjugators: ", timeSCSPSymGroup, "\n");
-			Print("Time testing conjugacies between sections: ", timeTestingConjugacies, "\n");
-            totalTime := 0;
-			timePruning := 0;
-			timeAssigning := 0;
-			timeMultiplying := 0;
-			timeRecoveringL1 := 0;
-			timeSectionFromSection := 0;
-			timeSettingUp := 0;
-			timeNewSystems := 0;
-			timeSCSPSymGroup := 0;
-			timeTestingConjugacies := 0;
+            for tree_size in TREE_SIZES do 
+                for one_prob in ONE_PROBS do 
+                    for num_generators in NUM_GENERATORS do 
+                        for i in [1..DIFFERENT_GROUPS] do 
+                            G := RandomContractingGroup(tree_size, num_generators, MAX_NUCLEUS_SIZE, one_prob);
+                            number_recovered := 0;
+                            for trial in [1..TRIALS] do
+                                gs := RandomElementList(g_len, g_len, G, list_size);
+                                r := RandomElement(r_len, G);
+                                hs := List(gs, g -> r^-1*g*r);
+                                #Print("Set up example. First g: ", gs[1], ", r: ", r, "\n");
+                                recovered_portrait := ConjugatorPortrait(G, gs, hs, r_len + 5, 2, true, 0.1, 0, 0);
+                                if recovered_portrait <> fail then
+                                    if recovered_portrait <> AutomPortrait(r) then 
+                                        Print("Recovered the incorrect portrait for:\nlist of gs: ", gs, "\nlist of hs: ", hs, "\nr: ", r, "\n");
+                                    fi;
+                                    number_recovered := number_recovered + 1;
+                                fi;
+                                Print("After ", trial, " trials, we have recovered ", number_recovered, " portraits. Runtime so far: ", Runtime(), ", average runtime per trial: ", Runtime() / trial, "\n");
+                            od;
+                            Print("For g_len ", g_len, ", r_len ", r_len, ", list_size ", list_size, ", we recovered ", number_recovered, " out of ", TRIALS, " portraits.\n");
+                            AppendTo("random_group_success_data.csv", g_len, ",", r_len, ",", list_size, ",", tree_size, ",", one_prob, ",", num_generators, ",", MAX_NUCLEUS_SIZE, ",", Size(GroupNucleus(G)), ",", TRIALS, ",", number_recovered, "\n");
+                            #simulate flush
+                            CloseStream(f);
+                            f := OutputTextFile("random_group_success_data.csv", true);
+                        od;
+                    od;
+                od;
+            od;	
 		od;
 	od;
 od;
+CloseStream(f);

@@ -71,7 +71,7 @@ contracting_groups := function(T_d, numGenerators, numTries, maxNucleusSize, one
         counter := counter + 1;
         Print("GROUP NUMBER ", counter, "\n");
 
-        nucleus := FindNucleus(G, nucleusDepth, true);
+        nucleus := FindNucleus(G, maxNucleusSize, true);
         Print("\n\n\n");
 
         if nucleus <> fail then
@@ -91,14 +91,13 @@ contracting_groups := function(T_d, numGenerators, numTries, maxNucleusSize, one
     return c_groups;
 end;
 
-cgs := contracting_groups(3,5,20,30,0.75);
-Print("\n\nCONTRACTING GROUPS:");
+#cgs := contracting_groups(3,5,20,30,0.75);
+#Print("\n\nCONTRACTING GROUPS:");
 
-for i in [1..Length(cgs)] do
-    Print("\n\n", i, ". ", cgs[i], "\n");
-    Print("Nucleus size: ", Size(GroupNucleus(cgs[i])), "\n");
-od;
-quit;
+#for i in [1..Length(cgs)] do
+#    Print("\n\n", i, ". ", cgs[i], "\n");
+#    Print("Nucleus size: ", Size(GroupNucleus(cgs[i])), "\n");
+#od;
 countOnes := function(c_grs)
     # extend contracting groups to have more generators?
 end;
@@ -165,4 +164,4 @@ testing_c_grs := function(p_list, num_gens_list, degree_list, num_tries_each, nu
     CloseStream(f2);
 end;
 
-testing_c_grs([0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1], [5,4,3,2], [5,6,7,8], 30, 40);
+testing_c_grs([0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1], [4,3,2], [7,8], 30, 40);

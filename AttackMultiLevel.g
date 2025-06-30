@@ -52,24 +52,16 @@ IntersectionOfConjugators := function(g_t, h_t, level)
     return Elements(ghConjugators);
 end;
 
-#Helper method to recover action of r on the first level. Takes one (g, h) pair and 
-#possible sigma_r and tests the conjugacy relationships given by each sigma_r
 TestConjugacyRelationships := function(g, h, candidate_sigma_r, level)
-    local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, 
-    fixed_points, size, orbits_of_size, valid_sigma_r, sigma_r, valid, 
-    orbit, lhs, rhs, current_index, section, arentConj;
+    local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, size,
+        relationsToPerms, dictKeys, RotateProduct, sigma_r, orbits_of_size,
+        orbit, current_index, lhs, rhs, i, permsWithRelation, j, permsWithKey;
 
-    totalTime := totalTime - Runtime();
-    multiCycleTime := multiCycleTime - Runtime();
     sigma_g := PermOnLevel(g, level);
     cycle_structure := CycleStructurePerm(sigma_g);
-    orbits := Orbits(Group(sigma_g));
+    orbits := OrbitsPerms([sigma_g], [1..N_LETTERS]);
     sizesWithMultipleCycles := []; 
-    fixed_points := [1..N_LETTERS];
-    if not IsOne(sigma_g) then
-        SubtractSet(fixed_points, MovedPoints(sigma_g));
-    fi;
-    if Length(fixed_points) > 1 then 
+    if N_LETTERS^level - Length(MovedPoints(sigma_g)) > 1 then 
         Append(sizesWithMultipleCycles, [1]);
     fi;
     for size in [1..Length(cycle_structure)] do
@@ -78,48 +70,65 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r, level)
             Append(sizesWithMultipleCycles, [size + 1]);
         fi;
     od;
-    multiCycleTime := multiCycleTime + Runtime();
-    valid_sigma_r := [];
+
+    relationsToPerms := NewDictionary([[1], [1]], true);
+    dictKeys := [];
+
+    RotateProduct := function(factors)
+        local min;
+        min := Minimum(factors);
+        while factors[1] <> min do 
+            Append(factors, [factors[1]]);
+            Remove(factors, 1);
+        od;
+    end;
+
     for sigma_r in candidate_sigma_r do
-        valid := true;
         for size in sizesWithMultipleCycles do
-            orbitsOfSizeTime := orbitsOfSizeTime - Runtime();
-            if size = 1 then 
-                orbits_of_size := List(fixed_points, pt -> [pt]);
-            else 
-                orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
-            fi;
-            orbitsOfSizeTime := orbitsOfSizeTime + Runtime();
+            orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
             for orbit in orbits_of_size do
-                #g_{a_1}g_{a_2}...g_{a_n} ~ h_{b_1}h_{b_2}...h_{b_n}
-                settingUpRelationTime := settingUpRelationTime - Runtime();
-                lhs := One(G); 
-                rhs := One(G);
                 current_index := orbit[1];
-                for section in [1..size] do 
-                    lhs := lhs * Sections(g, level)[current_index];
-                    rhs := rhs * Sections(h, level)[current_index^sigma_r];
+                lhs := [];
+                rhs := [];
+                for i in [1..size] do 
+                    Append(lhs, [current_index]);
+                    Append(rhs, [current_index^sigma_r]);
                     current_index := current_index^sigma_g;
                 od;
-                settingUpRelationTime := settingUpRelationTime + Runtime();
-                timeInHelper := timeInHelper - Runtime();
-                arentConj := AreNotConjugateOnLevel(lhs, rhs, 2);
-                timeInHelper := timeInHelper + Runtime();
-                if arentConj then
-                    valid := false;
-                    break;
+                RotateProduct(lhs);
+                RotateProduct(rhs);
+                if KnowsDictionary(relationsToPerms, [lhs, rhs]) then 
+                    Append(LookupDictionary(relationsToPerms, [lhs, rhs]), [sigma_r]);
+                else 
+                    AddDictionary(relationsToPerms, [lhs, rhs], [sigma_r]);
+                    Append(dictKeys, [[lhs, rhs]]);
                 fi;
             od;
-            if not valid then 
-                break;
-            fi;
         od;
-        if valid then
-            Append(valid_sigma_r, [sigma_r]);
-        fi;
     od;
-    totalTime := totalTime + Runtime();
-    return valid_sigma_r;
+
+    #sizesWithMultipleCycles is increasing, so 
+    #dictKeys is already sorted from short relations to long ones. 
+    i := 1;
+    while Length(candidate_sigma_r)  > 1 and i <= Length(dictKeys) do 
+        lhs := Product(List(dictKeys[i][1], index -> Sections(g, level)[index]));
+        rhs := Product(List(dictKeys[i][2], index -> Sections(h, level)[index]));
+        Print("rhs: ", rhs, "lhs: ", lhs, "\n");
+        if AreNotConjugateOnLevel(lhs, rhs, 2) then 
+            permsWithRelation := LookupDictionary(relationsToPerms, dictKeys[i]);
+            Print("Removing permutations ", permsWithRelation, "\n");
+            SubtractSet(candidate_sigma_r, permsWithRelation);
+            #looping backwards because we will remove elements of dictKeys
+            for j in Reversed([i+1..Length(dictKeys)]) do 
+                permsWithKey := LookupDictionary(relationsToPerms, dictKeys[i]);
+                SubtractSet(permsWithKey, permsWithRelation);
+                if Length(permsWithKey) = 0 then 
+                    Remove(dictKeys, j);
+                fi;
+            od;
+        fi;
+        i := i + 1;
+    od;
 end;
 
 recoveringL1 := function(g_t, h_t, max_level_to_try)
@@ -150,7 +159,7 @@ recoveringL1 := function(g_t, h_t, max_level_to_try)
                     SubtractSet(fixed_points, MovedPoints(sigma_g));
                 fi;
             if fixed_points > 1 or Maximum(CycleStructurePerm(sigma_g)) > 1 then 
-                possibleRs := TestConjugacyRelationships(g_t[i], h_t[i], possibleRs, current_level);
+               TestConjugacyRelationships(g_t[i], h_t[i], possibleRs, current_level);
             fi;
             i := i + 1;
             Print("Elems remaining after a round of conjugacy relations: ", Length(possibleRs), "\n");
@@ -314,7 +323,8 @@ RandomStabilizerIMGZ := function(level, innerWordLength, conjugatorLength)
     return product;
 end;
 
-gs := List([1..50], i -> RandomStabilizerIMGZ(2, 10, 10));
+gs := List([1..50], i -> RandomStabilizerIMGZ(3, 10, 10));
 r := Product(List([1..50], i -> Random(G)));
 hs := List(gs, g -> g^r);
 recoveringL1(gs, hs, 10);
+quit;

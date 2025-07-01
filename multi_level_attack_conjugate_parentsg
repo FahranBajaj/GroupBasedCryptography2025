@@ -30,30 +30,7 @@ FindAllConjugators := function(G, g, h)
     return RightCoset(centralizer, r);
 end;
 
-IntersectionOfConjugators := function(g_t, h_t, level)
-    local sigma_g, sigma_h, ghConjugators, allConj, i;
-
-    # getting tuples of g and h values
-    ghConjugators := FindAllConjugators(PermGroupOnLevel(G, level), PermOnLevel(g_t[1], level), PermOnLevel(h_t[1], level));
-    i := 2;
-    while Size(ghConjugators) > 1 and i <= Length(g_t) do
-        # all conjugators of a g/h pair
-        sigma_g := PermOnLevel(g_t[i], level);
-        sigma_h := PermOnLevel(h_t[i], level);
-        allConj := FindAllConjugators(PermGroupOnLevel(G, level), sigma_g, sigma_h);
-        ghConjugators := Intersection(ghConjugators, allConj);
-        i := i + 1;
-    od;
-    if Size(ghConjugators) = 1 then 
-        return ghConjugators[1];
-    fi;
-    
-    Print("Size of perm group: ", Size(PermGroupOnLevel(G, level)), "\n");
-    Print("Elements remaining: ", Size(ghConjugators), "\n");
-    return Elements(ghConjugators);
-end;
-
-IntersectionOfConjugators2 := function(g_t, h_t, level, prev_conj)
+IntersectionOfConjugators := function(g_t, h_t, level, prev_conj)
     local sigma_g, sigma_h, ghConjugators, allConj, i, A, B, A_gens, imgs, phi, ker, r_c, r_c_list, r_c_reps, possible_conj_cosets, rep;
 
     # getting tuples of g and h values
@@ -73,34 +50,34 @@ IntersectionOfConjugators2 := function(g_t, h_t, level, prev_conj)
     fi;
 
     # try to narrow down what's left by using previous level!
+    if level > 1 then
+        # homomorphism from P_n to P_(n-1): child to parent
+        A := PermGroupOnLevel(G,level);
+        B := PermGroupOnLevel(G, level-1);
 
-    # homomorphism from P_n to P_(n-1): child to parent
-    A := PermGroupOnLevel(G,level);
-    B := PermGroupOnLevel(G, level-1);
+        A_gens := GeneratorsOfGroup(A);
+        imgs := List(A_gens, a -> PermActionOnLevel(a,level,level-1,2));        # change to general deg of tree
 
-    A_gens := GeneratorsOfGroup(A);
-    imgs := List(A_gens, a -> PermActionOnLevel(a,level,level-1,2));        # change to general deg of tree
-
-    phi := GroupHomomorphismByImages(A, B, A_gens, imgs);
+        phi := GroupHomomorphismByImages(A, B, A_gens, imgs);
 
 
-    # Take P_n/ker(f) and consider one rep from each coset
-    ker := Kernel(phi);
-    r_c := RightCosets(A,ker);
-    r_c_list := Elements(r_c);      # might not want to do this for time?
-    r_c_reps := List(r_c_list, rc -> Representative(rc));
+        # Take P_n/ker(f) and consider one rep from each coset
+        ker := Kernel(phi);
+        r_c := RightCosets(A,ker);
+        r_c_list := Elements(r_c);      # might not want to do this for time?
+        r_c_reps := List(r_c_list, rc -> Representative(rc));
 
-    # if the image of the rep is in old allConj, keep the coset
-    possible_conj_cosets := [];  # the keepers
+        # if the image of the rep is in old allConj, keep the coset
+        possible_conj_cosets := [];  # the keepers
 
-    for i in [1..Length(r_c_reps)] do
-        if phi(r_c_reps[i]) in prev_conj then   # PROBLEMATIC, ADD PRINT STATEMENTS
-            Print("rep is in the previous level\n");
-            Append(possible_conj_cosets, Elements(r_c_list[i]));      # append the coset or its elements?
-        fi;
-    od;
+        for i in [1..Length(r_c_reps)] do
+            if phi(r_c_reps[i]) in prev_conj then
+                Append(possible_conj_cosets, Elements(r_c_list[i]));
+            fi;
+        od;
 
-    ghConjugators := Intersection(ghConjugators,possible_conj_cosets);
+        ghConjugators := Intersection(ghConjugators,possible_conj_cosets);
+    fi;
     
     Print("Size of perm group: ", Size(PermGroupOnLevel(G, level)), "\n");
     Print("Elements remaining: ", Size(ghConjugators), "\n");
@@ -185,7 +162,7 @@ end;
 recoveringL1 := function(g_t, h_t, max_level_to_try)
     local current_level, possibleRs, i, sigma_g, fixed_points, previous_conjs;
 
-    previous_conjs := [];   # me!
+    previous_conjs := [];   # me
 
     for current_level in [1..max_level_to_try] do 
         timeInHelper := 0;
@@ -194,13 +171,11 @@ recoveringL1 := function(g_t, h_t, max_level_to_try)
         orbitsOfSizeTime := 0;
         settingUpRelationTime := 0;
         Print("Attempting on level ", current_level, "\n");
+
         #Get possible sigma_r by looking at permutations that could conjugate all sigma_g/sigma_h pairs
-        if current_level = 1 then   # ME!
-            possibleRs := IntersectionOfConjugators(g_t, h_t, current_level);
-        else
-            previous_conjs := possibleRs;
-            possibleRs := IntersectionOfConjugators2(g_t, h_t, current_level, previous_conjs);
-        fi;
+        possibleRs := IntersectionOfConjugators(g_t, h_t, current_level, previous_conjs);
+
+        previous_conjs := possibleRs;
 
         if Length(possibleRs) = 1 then
             return possibleRs[1];
@@ -208,6 +183,7 @@ recoveringL1 := function(g_t, h_t, max_level_to_try)
         if current_level < max_level_to_try then 
             continue;
         fi;
+
         #Narrow down possibilities for sigma_r by looking at conjugacy relationships between sections
         i := 1;
         while i <= Length(g_t) and Length(possibleRs) > 1 do
@@ -235,43 +211,6 @@ recoveringL1 := function(g_t, h_t, max_level_to_try)
     Print("Failed.\n");
     return fail;
 end;
-
-#recoveringL1 := function(g_t, h_t, max_level_to_try)
-#    local current_level, sigma_r;
-#
-#    for current_level in [1..max_level_to_try] do
-#        Print("Attempting on level ", current_level, "\n");
-#        #Get possible sigma_r by looking at permutations that could conjugate all sigma_g/sigma_h pairs
-#        Print("Working on intersection of conjugators...\n");
-#        sigma_r := IntersectionOfConjugators(g_t, h_t, current_level);
-#
-#        if not (sigma_r = fail) then
-#            Print("Succeeded on level ", current_level, "\n");
-#            return [current_level, sigma_r];
-#        fi;
-#        #Narrow down possibilities for sigma_r by looking at conjugacy relationships between sections
-#        #i := 1;
-#        #Print("Testing conjugacy relations between sections\n");
-#        #while i <= Length(g_t) and Length(possibleRs) > 1 do
-#        #    sigma_g := PermOnLevel(g_t[i], current_level);            
-#        #    fixed_points := [1..N_LETTERS];
-#        #        if not IsOne(sigma_g) then
-#        #            SubtractSet(fixed_points, MovedPoints(sigma_g));
-#        #        fi;
-#        #    if fixed_points > 1 or Maximum(CycleStructurePerm(sigma_g)) > 1 then 
-#        #        possibleRs := TestConjugacyRelationships(g_t[i], h_t[i], possibleRs, current_level);
-#        #    fi;
-#        #    i := i + 1;
-#        #od;
-#        #if Length(possibleRs) = 1 then 
-#        #    Print("Succeeded on level ", current_level, "\n");
-#        #    return [current_level, possibleRs[1]];
-#        #fi;
-#    od;
-#
-#    Print("Failed.\n");
-#    return fail;
-#end;
 
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 RandomWordInGenerators := function(len, num_generators)
@@ -384,4 +323,4 @@ end;
 gs := List([1..50], i -> RandomStabilizerIMGZ(2, 10, 10));
 r := Product(List([1..50], i -> Random(G)));
 hs := List(gs, g -> g^r);
-recoveringL1(gs, hs, 10);
+recoveringL1(gs, hs, 4);

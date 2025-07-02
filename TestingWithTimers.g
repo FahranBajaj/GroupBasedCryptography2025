@@ -256,7 +256,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 						rhs := rhs * Section(h, current_index^sigma_r);
 						current_index := current_index^sigma_g;
 					od;
-					if AreNotConjugateOnLevel(lhs, rhs, 4) then
+					if AreNotConjugateOnLevel(lhs, rhs, 2) then
 						valid := false;
 						break;
 					fi;

@@ -30,12 +30,15 @@ RandomElementList := function(min_len, max_len, group, list_size)
    
     AG_UseRewritingSystem(group);
     relations := FindGroupRelations(group,2);
+	Print("Found relations\n");
 
     relations := Filtered(relations, x -> (Length(Word(x)) <= 3) ); 
+	Print("Filtered relations\n");
 
     if not relations = [] then
 	    AG_AddRelators(group, relations);
     fi;
+	Print("Added relators\n");
 
     rws        := AG_RewritingSystem(group);
     generators := GeneratorsOfMonoid(Image(rws!.mhom));
@@ -107,7 +110,8 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
 		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
 		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
-		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation;
+		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation,
+		PruneSingleLevel;
 
 	N_LETTERS := DegreeOfTree(G);
 
@@ -127,28 +131,25 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		local gs, cd_UB, elements, elem_depths, ed, x_bar, differences, variance, sigma, g;
 		# N: sample size of elements with same length l(g), sigma: standard deviation, x_bar sample mean, epsilon: small
 		gs := RandomElementList(r_length, r_length, G, N);
-        Print("Found the random elements\n");
 		N := N*1.0;
 
 		elem_depths := [];
 			
-        i := 0;
-        for g in gs do
-            ed := AutomPortraitDepth(g);
-            i := i + 1;
-            Print("Done with ", i, "elements.\n");
-            Append(elem_depths, [ed]);
-        od;
-        
-        x_bar := Sum(elem_depths)/Length(elem_depths);
-        differences := List(elem_depths, x -> (x-x_bar)^2);
-        variance := Sum(differences)/(Length(gs)-1);
-        sigma := Sqrt(variance*1.0);
+			for g in gs do
+				ed := AutomPortraitDepth(g);
+				Append(elem_depths, [ed]);
+			od;
+			
+			x_bar := Sum(elem_depths)/Length(elem_depths);
 
-        # contracting depth with probability 1 - epsilon (from their paper)
-        cd_UB := Int(Ceil(x_bar + (Sqrt((N^(1/3)+1)/(epsilon*(N^(1/3)))) + Sqrt((N^(1/3)+1)/(epsilon*N)))*sigma));
+			differences := List(elem_depths, x -> (x-x_bar)^2);
+			variance := Sum(differences)/(Length(gs)-1);
+			sigma := Sqrt(variance*1.0);
 
-		return [elem_depths, cd_UB];
+			# contracting depth with probability 1 - epsilon (from their paper)
+			cd_UB := Int(Ceil(x_bar + (Sqrt((N^(1/3)+1)/(epsilon*(N^(1/3)))) + Sqrt((N^(1/3)+1)/(epsilon*N)))*sigma));
+
+		return cd_UB;
 	end;
 
 	PortraitDepthUpperBound := function(n)
@@ -327,6 +328,9 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	#given portrait with a bunch of placeholders, replace with nucleus elements
 	AssignNucleusElements := function(portrait, portrait_depth)
 		#unwrap layers of portrait that are not necessarily nucleus elements
+		if Length(portrait) = 1 then 
+			return portrait;
+		fi;
 		if portrait_depth > nucleus_distinct_level then
 			return Concatenation([portrait[1]], List([1..N_LETTERS], i -> AssignNucleusElements(portrait[i+1], portrait_depth - 1)));
 		fi;
@@ -348,6 +352,31 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 				return p ;
 			else 
 				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1]))) ;
+				for i in [1..Length(nucleus_identified)] do 
+						if p_int = nucleus_identified[i][2] then
+							return nucleus_identified[i][1];
+						fi;
+					od;
+				return p_int ;
+			fi;
+		end;
+
+		return prune(portrait);
+	end;
+
+	PruneSingleLevel := function(portrait)
+		local nucleus, nucleus_identified, prune;
+
+		nucleus := List(GroupNucleus(G), x-> [x]) ; 
+		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
+
+		prune := function(p) 
+			local p_int , i ; 
+			p_int := [] ;
+			if p in nucleus then 
+				return p ;
+			else 
+				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> p[x+1])) ;
 				for i in [1..Length(nucleus_identified)] do 
 						if p_int = nucleus_identified[i][2] then
 							return nucleus_identified[i][1];
@@ -448,10 +477,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 	#Recover portrait of secret conjugator
 	ConjugatorPortrait:=function(short_g_list, short_h_list, key_length )
-		local portrait, cportrait, ConjugatorPortraitRecursive, contracting_depth,
-			gs_hs_to_multiply, new_g_list, new_h_list, i, idxs, gs, hs, portrait_of_r;
+		local portrait, ConjugatorPortraitRecursive, contracting_depth,
+			gs_hs_to_multiply, new_g_list, new_h_list, i, idxs, gs, hs;
 
 		contracting_depth := PortraitDepthUpperBound(key_length);
+		Print("Contracting depth is: ", contracting_depth, "\n");
+		Print("Nucleus distinct level is: ", nucleus_distinct_level, "\n");
 
 		# Recursively builds portrait of conjugator from lists of conjugate pairs
 		ConjugatorPortraitRecursive :=function(g_list, h_list, level)
@@ -461,7 +492,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
-				current_portrait_depth, j, section_index;
+				current_portrait_depth, j, section_index, portrait_of_r;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
@@ -470,7 +501,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 			current_portrait_depth := contracting_depth + nucleus_distinct_level - level;
 			if current_portrait_depth = 0 then
-				return Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])); 
+				portrait_of_r :=  Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])); 
+				if nucleus_distinct_level = 1 then 
+					portrait_of_r := AssignNucleusElements(portrait_of_r, 1);
+				fi;
+				Print("Base case. Returning successfully from level ", level, "\n");
+				return portrait_of_r;
 			fi;
 
 			#If we get to this point, we know how r acts on the first level
@@ -543,6 +579,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 								#g_{index}^-1 * r_{index} * h_{h_index}
 								if not (IsBound(sections_of_r[cycle_member])) then 
 									new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, index))), sections_of_r[index]), AutomPortrait(Section(h, h_index)));
+									if level <= contracting_depth then 
+										new_section := AssignNucleusElements(new_section, current_portrait_depth);
+									fi;
+									if level < contracting_depth then 
+										new_section := PrunePortrait(new_section);
+									fi;
 								else 
 									new_section := sections_of_r[cycle_member];
 								fi;
@@ -559,6 +601,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 									#g_{cycle_member}^-1 * new_section * h_{h_index}
 									if not (IsBound(sections_of_r[cycle_member^sigma_g])) then 
 										new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, cycle_member))), new_section), AutomPortrait(Section(h, h_index)));
+										if level <= contracting_depth then 
+											new_section := AssignNucleusElements(new_section, current_portrait_depth);
+										fi;
+										if level < contracting_depth then 
+											new_section := PrunePortrait(new_section);
+										fi;
 									else 
 										new_section := sections_of_r[cycle_member^sigma_g];
 									fi;
@@ -584,6 +632,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			#as well as all of the sections. The last thing we need to do is convert
 			#these back into a portrait and return.
 			portrait_of_r := Concatenation([sigma_r], sections_of_r);
+			if level = contracting_depth + 1 then 
+				portrait_of_r := AssignNucleusElements(portrait_of_r, nucleus_distinct_level);
+			elif level < contracting_depth + 1 then 
+				portrait_of_r := PruneSingleLevel(portrait_of_r);
+			fi;
+			Print("Returning successfully from level ", level, "\n");
 			return portrait_of_r;
 
 		end; #End of ConjugatorPortraitRecursive
@@ -609,10 +663,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		if portrait = fail then 
 			return fail;
 		fi;
-		cportrait := AssignNucleusElements(portrait, contracting_depth + nucleus_distinct_level);
-		cportrait := PrunePortrait(cportrait);
-		return cportrait;
-
+		return portrait;
 	end; # End of ConjugatorPortrait
 	return ConjugatorPortrait(g_list, h_list, r_length);
 end;
@@ -684,14 +735,20 @@ G_LENS := [10];
 R_LENS := [50];
 LIST_SIZES := [50];
 DIFFERENT_GROUPS := 20;
-ONE_PROBS := [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3];
-TRIALS := 10;
+ONE_PROBS := [0.6, 0.5, 0.4];
+TRIALS := 1;
 MAX_NUCLEUS_SIZE := 30;
 TREE_SIZES := [5];
 NUM_GENERATORS := [4];
+runtime := 0;
+
+#####################################
+#not a parameter, need to change in the code
+LEVEL_FOR_CONJUGATE_SECTION_TEST := 4;
+#####################################
 
 f := OutputTextFile("random_group_success_data.csv", true);
-#header: g_len,r_len,list_size,tree_size,one_prob,num_generators,max_nucleus_size,nucleus_size,trials,number_recovered
+#header: g_len,r_len,list_size,tree_size,one_prob,num_generators,max_nucleus_size,nucleus_size,level_for_conjugate_section_test,trials,number_recovered,time
 
 #placeholder for global variable
 G := AutomatonGroup("a = (1)");
@@ -703,23 +760,30 @@ for list_size in LIST_SIZES do
                     for num_generators in NUM_GENERATORS do 
                         for i in [1..DIFFERENT_GROUPS] do 
                             G := RandomContractingGroup(tree_size, num_generators, MAX_NUCLEUS_SIZE, one_prob);
+							Print("Group found.\n");
                             number_recovered := 0;
+							runtime := 0;
                             for trial in [1..TRIALS] do
                                 gs := RandomElementList(g_len, g_len, G, list_size);
+								Print("gs chosen\n");
                                 r := RandomElement(r_len, G);
+								Print("r chosen\n");
                                 hs := List(gs, g -> r^-1*g*r);
                                 #Print("Set up example. First g: ", gs[1], ", r: ", r, "\n");
+								runtime := runtime - Runtime();
+								Print("Set up trial.\n");
                                 recovered_portrait := ConjugatorPortrait(G, gs, hs, r_len + 5, 2, true, 0.1, 0, 0);
+								runtime := runtime + Runtime();
                                 if recovered_portrait <> fail then
                                     if recovered_portrait <> AutomPortrait(r) then 
                                         Print("Recovered the incorrect portrait for:\nlist of gs: ", gs, "\nlist of hs: ", hs, "\nr: ", r, "\n");
                                     fi;
                                     number_recovered := number_recovered + 1;
                                 fi;
-                                Print("After ", trial, " trials, we have recovered ", number_recovered, " portraits. Runtime so far: ", Runtime(), ", average runtime per trial: ", Runtime() / trial, "\n");
+                                Print("After ", trial, " trials, we have recovered ", number_recovered, " portraits.\n");
                             od;
                             Print("For g_len ", g_len, ", r_len ", r_len, ", list_size ", list_size, ", we recovered ", number_recovered, " out of ", TRIALS, " portraits.\n");
-                            AppendTo("random_group_success_data.csv", g_len, ",", r_len, ",", list_size, ",", tree_size, ",", one_prob, ",", num_generators, ",", MAX_NUCLEUS_SIZE, ",", Size(GroupNucleus(G)), ",", TRIALS, ",", number_recovered, "\n");
+                            AppendTo("random_group_success_data.csv", g_len, ",", r_len, ",", list_size, ",", tree_size, ",", one_prob, ",", num_generators, ",", MAX_NUCLEUS_SIZE, ",", Size(GroupNucleus(G)), ",", LEVEL_FOR_CONJUGATE_SECTION_TEST, ",", TRIALS, ",", number_recovered, ",", runtime, "\n");
                             #simulate flush
                             CloseStream(f);
                             f := OutputTextFile("random_group_success_data.csv", true);

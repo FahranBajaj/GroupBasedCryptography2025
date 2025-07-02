@@ -474,7 +474,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		local i, perms, l;
 
 		if Length(portrait)=1 then 
-			return PermOnLevel(portrait[1], 1); 
+			return PermOnLevel(portrait[1], depth_of_portrait); 
 		fi;
 
 		if depth_of_portrait=1 then

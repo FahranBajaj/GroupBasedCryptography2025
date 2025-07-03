@@ -100,11 +100,7 @@ new_autom_gr_fixed_ones := function(T_d, numGenerators, oneProb)
     #Append(weightedSections, List([1..numOtherGen], x -> ((x) mod numGenerators) + 2));
 
     for i in [1..numOtherGen] do
-        if i <= num_generators then
-            Append(weightedSections, [i+1]);
-        else
-            Append(weightedSections, [Random([2..num_generators+1])]);
-        fi;
+        Append(weightedSections, [Random([2..num_generators+1])]);
     od;
 
     # making lists

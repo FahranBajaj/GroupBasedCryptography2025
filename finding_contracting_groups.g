@@ -57,7 +57,8 @@ end;
 new_autom_gr_fixed_ones := function(T_d, numGenerators, oneProb)
     # T_d: d-ary tree, numGenerators: <= 40,
 
-    local possible_gens, possible_gens_no_id, sections, S_d, identity, weightedSections, num1s, numOtherGen, currentGen, i, j, myGens, currentAut, RemoveRandom;
+    local possible_gens, possible_gens_no_id, sections, S_d, identity, weightedSections, num1s, numOtherGen, currentGen, i, j, myGens, currentAut, RemoveRandom,
+    elm, r;
 
     # ex: AutomatonGroup([ [ 1, 2, ()], [ 1, 2, (1,2) ] ], [ "a", "b" ]); (a=1, b=2, etc)
     # setup for a new automaton group
@@ -100,7 +101,7 @@ new_autom_gr_fixed_ones := function(T_d, numGenerators, oneProb)
     #Append(weightedSections, List([1..numOtherGen], x -> ((x) mod numGenerators) + 2));
 
     for i in [1..numOtherGen] do
-        Append(weightedSections, [Random([2..num_generators+1])]);
+        Append(weightedSections, [Random([2..numGenerators+1])]);
     od;
 
     # making lists

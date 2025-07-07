@@ -52,7 +52,7 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r, level)
 
     sigma_g := PermOnLevel(g, level);
     cycle_structure := CycleStructurePerm(sigma_g);
-    orbits := OrbitsPerms([sigma_g], [1..N_LETTERS]);
+    orbits := OrbitsPerms([sigma_g], [1..N_LETTERS^level]);
     sizesWithMultipleCycles := []; 
     if N_LETTERS^level - Length(MovedPoints(sigma_g)) > 1 then 
         Append(sizesWithMultipleCycles, [1]);
@@ -405,8 +405,7 @@ RandomElement := function(len, group)
     return RandomElementList(len - 5, len + 5, group, 1)[1];
 end;
 
-gs := List([1..30], i -> RandomStabilizerIMGZ(5, 10, 10));
+gs := List([1..30], i -> RandomStabilizerIMGZ(3, 10, 10));
 r := RandomElement(10, G);
 hs := List(gs, g -> g^r);
-recoveringL1(gs, hs, 5, 10);
-quit;
+recoveringL1(gs, hs, 3, 10);

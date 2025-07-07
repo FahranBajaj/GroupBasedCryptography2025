@@ -215,7 +215,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
         sigma_g := PermOnLevel(g, level);
         cycle_structure := CycleStructurePerm(sigma_g);
-        orbits := OrbitsPerms([sigma_g], [1..N_LETTERS]);
+        orbits := OrbitsPerms([sigma_g], [1..N_LETTERS^level]);
         sizesWithMultipleCycles := []; 
         if N_LETTERS^level - Length(MovedPoints(sigma_g)) > 1 then 
             Append(sizesWithMultipleCycles, [1]);
@@ -822,14 +822,14 @@ RandomStabilizerIMGZ := function(level, innerWordLength, conjugatorLength)
     return product;
 end;
 
-g_list := List([1..30], i -> RandomStabilizerIMGZ(2, 10, 10));
+g_list := List([1..30], i -> RandomStabilizerIMGZ(3, 10, 10));
 R_LEN := 10;
 Print("gs chosen\n");
-r := c*a*(b*c)^2*a*b*a;
+r := RandomElement(R_LEN, G);
 Print("r chosen\n");
 h_list := List(g_list, g -> r^-1*g*r);
 Print("hs calculated\n");
-final := ConjugatorPortrait(G, g_list, h_list, R_LEN, 2, false, 0.1, 0, 0, 2); #r is probably not of length more than 20
+final := ConjugatorPortrait(G, g_list, h_list, R_LEN, 2, false, 0.1, 0, 0, 3); #r is probably not of length more than 20
 Print("r: ", r, "\n");
 Print("Portrait of r: ", AutomPortrait(r), "\n");
 Print("Portrait we found: ", final, "\n");

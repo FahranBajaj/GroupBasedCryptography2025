@@ -1,6 +1,7 @@
 LoadPackage("AutomGrp");
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 CONJUGATION_ACTION := OnPoints; # action is conjugation
+f := OutputTextFile("random_group_success_data.csv", true);
 
 # Returns true if list L contains no repeat elements 
 NoRepeats := function(L)
@@ -19,86 +20,24 @@ NoRepeats := function(L)
 	return no_repeats;
 end;
 
-#Slightly modified from 2024 group
-RandomElementList := function(min_len, max_len, group, list_size)
- 
-    local i , j, relations, rule, rules, rules_product, rules_equivalence, 
-		generators, family, randomelt, successors, gen, len, rws, letter_rep, 
-		starters, element_list;
+RandomElementList := function(len, group, list_size)
+	local element_list, generators, i, prod, j;
 
     element_list := [];
-   
-    AG_UseRewritingSystem(group);
-    relations := FindGroupRelations(group,2);
-	Print("Found relations\n");
+    generators := GeneratorsOfGroup(group);
 
-    relations := Filtered(relations, x -> (Length(Word(x)) <= 3) ); 
-	Print("Filtered relations\n");
-
-    if not relations = [] then
-	    AG_AddRelators(group, relations);
-    fi;
-	Print("Added relators\n");
-
-    rws        := AG_RewritingSystem(group);
-    generators := GeneratorsOfMonoid(Image(rws!.mhom));
- 
-    rules      := AG_RewritingSystemRules(group);
-    rules_product := [];
-    rules_equivalence := [];
-    family     := FamilyObj(Word(One(group)));
-
-    for rule in rules do
-	letter_rep := LetterRepAssocWord(rule[1]);
-	if Size(letter_rep) = 2 then
-		Add(rules_product, letter_rep);
-        elif Size(letter_rep) = 1 then
-		Add(rules_equivalence, [letter_rep[1], LetterRepAssocWord(rule[2])]);
-	fi;
-    od;
-
-    starters   := Set([1..Size(generators)]);
-    successors := List([1..Size(generators)], x -> Set([1..Size(generators)]) );
-   
-    # No generator can be followed by an element that will simplify the product 
-    for rule in rules_product do
-	RemoveSet(successors[rule[1]], rule[2]);
-    od;
-
-    # If two generators are equivalent, ignore one
-    for rule in rules_equivalence do
-	for i in [1..Size(successors)] do
-		RemoveSet(successors[i], rule[1]);
+   	for i in [1..list_size] do
+		prod := One(group);
+		for j in [1..len] do
+			prod := prod * Random(generators);
+		od;
+		Append(element_list, [prod]);
 	od;
-	successors[rule[1]] := [];
-	RemoveSet(starters, rule[1]);
-    od;
-
-    for i in [1..list_size] do
-	    gen :=  Random(starters);
-	    randomelt := [gen];
-	 	len := Random([min_len..max_len]);
-
-	    for j in [2..len] do  
-		    gen := Random(successors[gen]);
-		    Add( randomelt, gen );
-	    od;
-
-	    # Changes from denoting generators/inverses as 1, 2, 3.. to 1, -1, 2, -2..
-	    randomelt := List( randomelt, x -> (-1)^(x + 1)*Ceil(Float(x/2)) );
-	    randomelt := List( randomelt, x -> Int(x) );
-
-	    randomelt := AssocWordByLetterRep(family, randomelt);
-	    randomelt := Representative(randomelt, One(group));
-
-	    Add(element_list, randomelt);
-    od;
-
-    return element_list;
+	return element_list;
 end;
 
 RandomElement := function(len, group)
-    return RandomElementList(len - 5, len + 5, group, 1)[1];
+    return RandomElementList(len, group, 1)[1];
 end;
 
 
@@ -130,7 +69,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	ContractingDepthStatApprox := function(N, r_length)
 		local gs, cd_UB, elements, elem_depths, ed, x_bar, differences, variance, sigma, g;
 		# N: sample size of elements with same length l(g), sigma: standard deviation, x_bar sample mean, epsilon: small
-		gs := RandomElementList(r_length, r_length, G, N);
+		gs := RandomElementList(r_length, G, N);
 		N := N*1.0;
 
 		elem_depths := [];
@@ -209,63 +148,88 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 	#Helper method to recover action of r on the first level. Takes one (g, h) pair and 
 	#possible sigma_r and tests the conjugacy relationships given by each sigma_r
-	TestConjugacyRelationships := function(g, h, candidate_sigma_r)
-		local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, 
-		fixed_points, size, orbits_of_size, valid_sigma_r, sigma_r, valid, 
-		orbit, lhs, rhs, current_index, section;
-		sigma_g := PermOnLevel(g, 1);
-		cycle_structure := CycleStructurePerm(sigma_g);
-		orbits := Orbits(Group(sigma_g));
-		sizesWithMultipleCycles := []; 
-		fixed_points := [1..N_LETTERS];
-		if not IsOne(sigma_g) then
-			SubtractSet(fixed_points, MovedPoints(sigma_g));
-		fi;
-		if Length(fixed_points) > 1 then 
-			Append(sizesWithMultipleCycles, [1]);
-		fi;
-		for size in [1..Length(cycle_structure)] do
-			if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
-				#cycle_structure[1] is number of cycles of length 2
-				Append(sizesWithMultipleCycles, [size + 1]);
-			fi;
-		od;
-		valid_sigma_r := [];
-		for sigma_r in candidate_sigma_r do
-			valid := true;
-			for size in sizesWithMultipleCycles do
-				if size = 1 then 
-					orbits_of_size := List(fixed_points, pt -> [pt]);
-				else 
-					orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
-				fi;
-				for orbit in orbits_of_size do
-					#g_{a_1}g_{a_2}...g_{a_n} ~ h_{b_1}h_{b_2}...h_{b_n}
-					lhs := One(G); #identity
-					rhs := One(G);
-					current_index := orbit[1];
-					for section in [1..size] do 
-						lhs := lhs * Section(g, current_index);
-						rhs := rhs * Section(h, current_index^sigma_r);
-						current_index := current_index^sigma_g;
-					od;
-					if AreNotConjugateOnLevel(lhs, rhs, 4) then
-						valid := false;
-						break;
-					fi;
-				od;
-				if not valid then 
-					break;
-				fi;
-			od;
-			if valid then
-				Append(valid_sigma_r, [sigma_r]);
-			fi;
-		od;
-		return valid_sigma_r;
-	end;
-	
+		TestConjugacyRelationships := function(g, h, candidate_sigma_r)
+        local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, size,
+            relationsToPerms, dictKeys, RotateProduct, sigma_r, orbits_of_size,
+            orbit, current_index, lhs, rhs, i, permsWithRelation, j, permsWithKey,
+            valid_sigma_r;
 
+        sigma_g := PermOnLevel(g, 1);
+        cycle_structure := CycleStructurePerm(sigma_g);
+        orbits := OrbitsPerms([sigma_g], [1..N_LETTERS]);
+        sizesWithMultipleCycles := []; 
+        if N_LETTERS - Length(MovedPoints(sigma_g)) > 1 then 
+            Append(sizesWithMultipleCycles, [1]);
+        fi;
+        for size in [1..Length(cycle_structure)] do
+            if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
+                #cycle_structure[1] is number of cycles of length 2
+                Append(sizesWithMultipleCycles, [size + 1]);
+            fi;
+        od;
+
+        relationsToPerms := NewDictionary([[1], [1]], true);
+        dictKeys := [];
+
+        #Helper method to put each relation g_{i1}g_{i2}...g_{in} ~ h_{j1}h_{j2}...h{jn}
+        #into a canonical form where the smallest index comes first.
+        RotateProduct := function(factors)
+            local min;
+            min := Minimum(factors);
+            while factors[1] <> min do 
+                Append(factors, [factors[1]]);
+                Remove(factors, 1);
+            od;
+        end;
+
+        for sigma_r in candidate_sigma_r do
+            for size in sizesWithMultipleCycles do
+                orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
+                for orbit in orbits_of_size do
+                    current_index := orbit[1];
+                    lhs := [];
+                    rhs := [];
+                    for i in [1..size] do 
+                        Append(lhs, [current_index]);
+                        Append(rhs, [current_index^sigma_r]);
+                        current_index := current_index^sigma_g;
+                    od;
+                    RotateProduct(lhs);
+                    RotateProduct(rhs);
+                    if KnowsDictionary(relationsToPerms, [lhs, rhs]) then 
+                        Append(LookupDictionary(relationsToPerms, [lhs, rhs]), [sigma_r]);
+                    else 
+                        AddDictionary(relationsToPerms, [lhs, rhs], [sigma_r]);
+                        Append(dictKeys, [[lhs, rhs]]);
+                    fi;
+                od;
+            od;
+        od;
+
+        #sizesWithMultipleCycles is increasing, so 
+        #dictKeys is already sorted from short relations to long ones. 
+        i := 1;
+        valid_sigma_r := ShallowCopy(candidate_sigma_r);
+        while Length(valid_sigma_r)  > 1 and i <= Length(dictKeys) do 
+            lhs := Product(List(dictKeys[i][1], index -> Sections(g)[index]));
+            rhs := Product(List(dictKeys[i][2], index -> Sections(h)[index]));
+            if AreNotConjugateOnLevel(lhs, rhs, 2) then 
+                permsWithRelation := LookupDictionary(relationsToPerms, dictKeys[i]);
+                SubtractSet(valid_sigma_r, permsWithRelation);
+                #looping backwards because we will remove elements of dictKeys
+                for j in Reversed([i+1..Length(dictKeys)]) do 
+                    permsWithKey := LookupDictionary(relationsToPerms, dictKeys[i]);
+                    SubtractSet(permsWithKey, permsWithRelation);
+                    if Length(permsWithKey) = 0 then 
+                        Remove(dictKeys, j);
+                    fi;
+                od;
+            fi;
+            i := i + 1;
+        od;
+        return valid_sigma_r;
+    end;
+	
 	recoveringL1 := function(g_t, h_t)
 		local possibleRs, i, sigma_g, fixed_points;
 
@@ -505,7 +469,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 				if nucleus_distinct_level = 1 then 
 					portrait_of_r := AssignNucleusElements(portrait_of_r, 1);
 				fi;
-				Print("Base case. Returning successfully from level ", level, "\n");
+				Print("Base case, returning from level ", level, "\n");
 				return portrait_of_r;
 			fi;
 
@@ -549,7 +513,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 					if Length(new_g_list) = 0 then	
 						return fail;
 					fi;
-                    Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
+					Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 
@@ -668,59 +632,68 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	return ConjugatorPortrait(g_list, h_list, r_length);
 end;
 
-new_autom_gr := function(T_d, numGenerators, oneProb)
-    # T_d: d-ary tree, numGenerators: <= 40,
-
-    local possible_gens, sections, S_d, identity, weightedSections, num1s, numOtherGen, currentGen, i, j, myGens, currentAut;
-
-    # ex: AutomatonGroup([ [ 1, 2, ()], [ 1, 2, (1,2) ] ], [ "a", "b" ]); (a=1, b=2, etc)
-    # setup for a new automaton group
-    possible_gens := ["1", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t"]; # deal with 1!
-
-    S_d := SymmetricGroup(T_d);
-
-    sections := [];
-    identity := [];
-    Append(identity, List([1..T_d], x -> 1));
-    Append(identity, [One(S_d)]);
-    Append(sections, [identity]);
-
-    # getting correct probability of 1s
-    weightedSections := [];
-    num1s := Int(oneProb*1000.0);
-    numOtherGen := Int((1-oneProb)*1000.0/(numGenerators*1.0));
-
-    Append(weightedSections, List([1..num1s], x -> 1));
-    for i in [2..(numGenerators + 1)] do
-        Append(weightedSections, List([1..numOtherGen], x -> i));
-    od;
-
-    # making lists
-    for i in [2..(numGenerators+1)] do  # make some generators! skipping identity
-        currentGen := [];
-
-        for j in [1..T_d] do  # make some sections!
-            # OLD: Append(currentGen, [Random([1..(numGenerators+1)])]);   # CHANGE THIS TO USE PROBABILITY!
-            Append(currentGen, [Random(weightedSections)]);
-        od;
-
-        Append(currentGen, [Random(Elements(S_d))]);  # appending random permutation!
-        Append(sections, [currentGen]);
-    od;
-
-    # getting generators
-    myGens := List([1..(numGenerators+1)], i -> possible_gens[i]);
-
-    # new automaton group!
-    currentAut := AutomatonGroup(sections, myGens);
-    
-    return currentAut;
+TimeAttack := function (G, g_list, h_list, r_length, k, use_statistical_approx, epsilon,
+								extended_word_length, num_new_pairs)
+	local runtime, cport;
+	runtime := -1*Runtime();
+	cport := ConjugatorPortrait;
+	runtime := runtime + Runtime();
+	return [cport, runtime];
 end;
 
 RandomContractingGroup := function(T_d, numGenerators, maxNucleusSize, oneProb)
     # T_d: d-ary tree, numGenerators: <= 20, maxNucleusSize: where to quit, numTries: how many groups to generate
     # oneProb: Probability of a section being 1
-    local candidateGroup, nucleus;
+    local candidateGroup, nucleus, new_autom_gr;
+
+	new_autom_gr := function(T_d, numGenerators, oneProb)
+		# T_d: d-ary tree, numGenerators: <= 40,
+
+		local possible_gens, sections, S_d, identity, weightedSections, num1s, numOtherGen, currentGen, i, j, myGens, currentAut;
+
+		# ex: AutomatonGroup([ [ 1, 2, ()], [ 1, 2, (1,2) ] ], [ "a", "b" ]); (a=1, b=2, etc)
+		# setup for a new automaton group
+		possible_gens := ["1", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t"]; # deal with 1!
+
+		S_d := SymmetricGroup(T_d);
+
+		sections := [];
+		identity := [];
+		Append(identity, List([1..T_d], x -> 1));
+		Append(identity, [One(S_d)]);
+		Append(sections, [identity]);
+
+		# getting correct probability of 1s
+		weightedSections := [];
+		num1s := Int(oneProb*1000.0);
+		numOtherGen := Int((1-oneProb)*1000.0/(numGenerators*1.0));
+
+		Append(weightedSections, List([1..num1s], x -> 1));
+		for i in [2..(numGenerators + 1)] do
+			Append(weightedSections, List([1..numOtherGen], x -> i));
+		od;
+
+		# making lists
+		for i in [2..(numGenerators+1)] do  # make some generators! skipping identity
+			currentGen := [];
+
+			for j in [1..T_d] do  # make some sections!
+				# OLD: Append(currentGen, [Random([1..(numGenerators+1)])]);   # CHANGE THIS TO USE PROBABILITY!
+				Append(currentGen, [Random(weightedSections)]);
+			od;
+
+			Append(currentGen, [Random(Elements(S_d))]);  # appending random permutation!
+			Append(sections, [currentGen]);
+		od;
+
+		# getting generators
+		myGens := List([1..(numGenerators+1)], i -> possible_gens[i]);
+
+		# new automaton group!
+		currentAut := AutomatonGroup(sections, myGens);
+		
+		return currentAut;
+	end;
 
     while true do 
         candidateGroup := new_autom_gr(T_d, numGenerators, oneProb);
@@ -731,11 +704,32 @@ RandomContractingGroup := function(T_d, numGenerators, maxNucleusSize, oneProb)
     od;
 end;
 
+RunAttack := function(g_len, r_len, list_size, group, use_list_extension)
+	local g_list, r, h_list, num_new_pairs, number_of_factors, result;
+
+	g_list := RandomElementList(g_len, group, list_size);
+	r := RandomElement(r_len, group);
+	h_list := List(g_list, g -> r^-1*g*r);
+	if use_list_extension then 
+		num_new_pairs := 50;
+		if r_len > g_len then 
+			number_of_factors := Int(Ceil(Float(r_len/g_length))); 
+		else 
+			number_of_factors := 2;
+		fi;
+	else 
+		num_new_pairs := 0;
+		number_of_factors := 0;
+	fi;
+	result := IO_CallWithTimeout(rec(minutes := 30), TimeAttack, group, g_list, h_list, r_len, 2, true, 0.1, number_of_factors, num_new_pairs);
+	return result;
+end;
+
 G_LENS := [10];
 R_LENS := [50];
 LIST_SIZES := [50];
-DIFFERENT_GROUPS := 20;
-ONE_PROBS := [0.6, 0.5, 0.4];
+DIFFERENT_GROUPS := 50;
+ONE_PROBS := [0.7];
 TRIALS := 1;
 MAX_NUCLEUS_SIZE := 30;
 TREE_SIZES := [5];
@@ -744,10 +738,9 @@ runtime := 0;
 
 #####################################
 #not a parameter, need to change in the code
-LEVEL_FOR_CONJUGATE_SECTION_TEST := 4;
+LEVEL_FOR_CONJUGATE_SECTION_TEST := 2;
 #####################################
 
-f := OutputTextFile("random_group_success_data.csv", true);
 #header: g_len,r_len,list_size,tree_size,one_prob,num_generators,max_nucleus_size,nucleus_size,level_for_conjugate_section_test,trials,number_recovered,time
 
 #placeholder for global variable
@@ -764,7 +757,7 @@ for list_size in LIST_SIZES do
                             number_recovered := 0;
 							runtime := 0;
                             for trial in [1..TRIALS] do
-                                gs := RandomElementList(g_len, g_len, G, list_size);
+                                gs := RandomElementList(g_len, G, list_size);
 								Print("gs chosen\n");
                                 r := RandomElement(r_len, G);
 								Print("r chosen\n");
@@ -772,6 +765,7 @@ for list_size in LIST_SIZES do
                                 #Print("Set up example. First g: ", gs[1], ", r: ", r, "\n");
 								runtime := runtime - Runtime();
 								Print("Set up trial.\n");
+								Print("Group: ", G, "\n\ng list: ", gs, "\n\nr: ", r, "\n\n");
                                 recovered_portrait := ConjugatorPortrait(G, gs, hs, r_len + 5, 2, true, 0.1, 0, 0);
 								runtime := runtime + Runtime();
                                 if recovered_portrait <> fail then
@@ -779,7 +773,7 @@ for list_size in LIST_SIZES do
                                         Print("Recovered the incorrect portrait for:\nlist of gs: ", gs, "\nlist of hs: ", hs, "\nr: ", r, "\n");
                                     fi;
                                     number_recovered := number_recovered + 1;
-                                fi;
+								fi;
                                 Print("After ", trial, " trials, we have recovered ", number_recovered, " portraits.\n");
                             od;
                             Print("For g_len ", g_len, ", r_len ", r_len, ", list_size ", list_size, ", we recovered ", number_recovered, " out of ", TRIALS, " portraits.\n");

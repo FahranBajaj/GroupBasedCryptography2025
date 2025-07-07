@@ -205,62 +205,87 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	#Helper method to recover action of r on the first level. Takes one (g, h) pair and 
 	#possible sigma_r and tests the conjugacy relationships given by each sigma_r
 	TestConjugacyRelationships := function(g, h, candidate_sigma_r)
-		local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, 
-		fixed_points, size, orbits_of_size, valid_sigma_r, sigma_r, valid, 
-		orbit, lhs, rhs, current_index, section;
-		sigma_g := PermOnLevel(g, 1);
-		cycle_structure := CycleStructurePerm(sigma_g);
-		orbits := Orbits(Group(sigma_g));
-		sizesWithMultipleCycles := []; 
-		fixed_points := [1..N_LETTERS];
-		if not IsOne(sigma_g) then
-			SubtractSet(fixed_points, MovedPoints(sigma_g));
-		fi;
-		if Length(fixed_points) > 1 then 
-			Append(sizesWithMultipleCycles, [1]);
-		fi;
-		for size in [1..Length(cycle_structure)] do
-			if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
-				#cycle_structure[1] is number of cycles of length 2
-				Append(sizesWithMultipleCycles, [size + 1]);
-			fi;
-		od;
-		valid_sigma_r := [];
-		for sigma_r in candidate_sigma_r do
-			valid := true;
-			for size in sizesWithMultipleCycles do
-				if size = 1 then 
-					orbits_of_size := List(fixed_points, pt -> [pt]);
-				else 
-					orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
-				fi;
-				for orbit in orbits_of_size do
-					#g_{a_1}g_{a_2}...g_{a_n} ~ h_{b_1}h_{b_2}...h_{b_n}
-					lhs := One(G); #identity
-					rhs := One(G);
-					current_index := orbit[1];
-					for section in [1..size] do 
-						lhs := lhs * Section(g, current_index);
-						rhs := rhs * Section(h, current_index^sigma_r);
-						current_index := current_index^sigma_g;
-					od;
-					if AreNotConjugateOnLevel(lhs, rhs, 2) then
-						valid := false;
-						break;
-					fi;
-				od;
-				if not valid then 
-					break;
-				fi;
-			od;
-			if valid then
-				Append(valid_sigma_r, [sigma_r]);
-			fi;
-		od;
-		return valid_sigma_r;
-	end;
-	
+        local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, size,
+            relationsToPerms, dictKeys, RotateProduct, sigma_r, orbits_of_size,
+            orbit, current_index, lhs, rhs, i, permsWithRelation, j, permsWithKey,
+            valid_sigma_r;
 
+        sigma_g := PermOnLevel(g, 1);
+        cycle_structure := CycleStructurePerm(sigma_g);
+        orbits := OrbitsPerms([sigma_g], [1..N_LETTERS]);
+        sizesWithMultipleCycles := []; 
+        if N_LETTERS - Length(MovedPoints(sigma_g)) > 1 then 
+            Append(sizesWithMultipleCycles, [1]);
+        fi;
+        for size in [1..Length(cycle_structure)] do
+            if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
+                #cycle_structure[1] is number of cycles of length 2
+                Append(sizesWithMultipleCycles, [size + 1]);
+            fi;
+        od;
+
+        relationsToPerms := NewDictionary([[1], [1]], true);
+        dictKeys := [];
+
+        #Helper method to put each relation g_{i1}g_{i2}...g_{in} ~ h_{j1}h_{j2}...h{jn}
+        #into a canonical form where the smallest index comes first.
+        RotateProduct := function(factors)
+            local min;
+            min := Minimum(factors);
+            while factors[1] <> min do 
+                Append(factors, [factors[1]]);
+                Remove(factors, 1);
+            od;
+        end;
+
+        for sigma_r in candidate_sigma_r do
+            for size in sizesWithMultipleCycles do
+                orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
+                for orbit in orbits_of_size do
+                    current_index := orbit[1];
+                    lhs := [];
+                    rhs := [];
+                    for i in [1..size] do 
+                        Append(lhs, [current_index]);
+                        Append(rhs, [current_index^sigma_r]);
+                        current_index := current_index^sigma_g;
+                    od;
+                    RotateProduct(lhs);
+                    RotateProduct(rhs);
+                    if KnowsDictionary(relationsToPerms, [lhs, rhs]) then 
+                        Append(LookupDictionary(relationsToPerms, [lhs, rhs]), [sigma_r]);
+                    else 
+                        AddDictionary(relationsToPerms, [lhs, rhs], [sigma_r]);
+                        Append(dictKeys, [[lhs, rhs]]);
+                    fi;
+                od;
+            od;
+        od;
+
+        #sizesWithMultipleCycles is increasing, so 
+        #dictKeys is already sorted from short relations to long ones. 
+        i := 1;
+        valid_sigma_r := ShallowCopy(candidate_sigma_r);
+        while Length(valid_sigma_r)  > 1 and i <= Length(dictKeys) do 
+            lhs := Product(List(dictKeys[i][1], index -> Sections(g)[index]));
+            rhs := Product(List(dictKeys[i][2], index -> Sections(h)[index]));
+            if AreNotConjugateOnLevel(lhs, rhs, 2) then 
+                permsWithRelation := LookupDictionary(relationsToPerms, dictKeys[i]);
+                SubtractSet(valid_sigma_r, permsWithRelation);
+                #looping backwards because we will remove elements of dictKeys
+                for j in Reversed([i+1..Length(dictKeys)]) do 
+                    permsWithKey := LookupDictionary(relationsToPerms, dictKeys[i]);
+                    SubtractSet(permsWithKey, permsWithRelation);
+                    if Length(permsWithKey) = 0 then 
+                        Remove(dictKeys, j);
+                    fi;
+                od;
+            fi;
+            i := i + 1;
+        od;
+        return valid_sigma_r;
+    end;
+	
 	recoveringL1 := function(g_t, h_t)
 		local possibleRs, i, sigma_g, fixed_points;
 
@@ -666,9 +691,9 @@ AG_UseRewritingSystem(G);
 AG_UpdateRewritingSystem(G, 2);
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 g_list := List([1..10], i -> Random(G));
-r := Random(G);
+r := Product(List([1..10], i -> Random(G)));
 h_list := List(g_list, g -> r^-1*g*r);
-final := ConjugatorPortrait(G, g_list, h_list, 20, 2, false, 1, 3, 50); #r is probably not of length more than 20
+final := ConjugatorPortrait(G, g_list, h_list, 30, 2, false, 1, 3, 50); #r is probably not of length more than 20
 Print("r: ", r, "\n");
 Print("Portrait of r: ", AutomPortrait(r), "\n");
 Print("Portrait we found: ", final, "\n");

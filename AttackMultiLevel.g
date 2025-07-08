@@ -106,7 +106,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
 		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
 		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation,
-		PruneSingleLevel;
+		PruneSingleLevel, PermActionAtVertex, BuildPortrait;
 
 	N_LETTERS := DegreeOfTree(G);
 
@@ -291,55 +291,62 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
         
 
 	recoveringL1 := function(g_t, h_t, min_level_to_try, max_level_to_try)
-        local possibleRsFirstLevel, current_level, possibleRs, i, sigma_g, 
-        fixed_points, firstLevelRs;
+        local UniqueOnLevel, current_level, possibleRs, i, sigma_g, 
+        fixed_points, level;
 
-        possibleRsFirstLevel := function(possibleRs, level)
-            local firstLevelActions, i;
-            firstLevelActions := List(possibleRs, sigma_r -> PermActionOnLevel(sigma_r, level, 1, N_LETTERS));
-            Sort(firstLevelActions);
-            i := 1;
-            while i < Length(firstLevelActions) do 
-                if firstLevelActions[i] = firstLevelActions[i + 1] then 
-                    Remove(firstLevelActions, i);
-                else 
-                    i := i + 1;
-                fi;
-            od;
-            return firstLevelActions;
+        UniqueOnLevel := function(possibleRs, bigLevel, smallLevel)
+			local firstAction, i;
+
+            firstAction := PermActionOnLevel(possibleRs[1], bigLevel, smallLevel, 2);
+			i := 2;
+			while i <= Length(possibleRs) do 
+				if PermActionOnLevel(possibleRs[i], bigLevel, smallLevel, 2) <> firstAction then 
+					return false;
+				fi;
+				i := i + 1;
+			od;
+			return true;
         end;
 
         for current_level in [min_level_to_try..max_level_to_try] do 
             Print("Attempting to recover action ", current_level, " levels down...\n");
             #Get possible sigma_r by looking at permutations that could conjugate all sigma_g/sigma_h pairs
             possibleRs := IntersectionOfConjugators(g_t, h_t, current_level);
-            firstLevelRs := possibleRsFirstLevel(possibleRs, current_level);
-            if Length(firstLevelRs) = 1 then
-                return firstLevelRs[1];
+			Print("\tDone with intersection of conjugators\n");
+
+			#this if statement will usually be false so may as well check it before
+			#looping through levels in reversed order
+            if UniqueOnLevel(possibleRs, current_level, 1) then
+                for level in Reversed([2..current_level]) do 
+					if UniqueOnLevel(possibleRs, current_level, level) then 
+						return [level, PermActionOnLevel(possibleRs[1], current_level, level, 2)];
+					fi;
+				od;
+				return [1, PermActionOnLevel(possibleRs[1], current_level, 1, 2)];
             fi;
-            #if current_level < 6 then 
-            #    continue;
-            #fi;
             #Narrow down possibilities for sigma_r by looking at conjugacy relationships between sections
             i := 1;
-            while i <= Length(g_t) and Length(firstLevelRs) > 1 do
+            while i <= Length(g_t) and not UniqueOnLevel(possibleRs, current_level, 1) do
                 sigma_g := PermOnLevel(g_t[i], current_level);            
                 fixed_points := [1..N_LETTERS^current_level];
                     if not IsOne(sigma_g) then
                         SubtractSet(fixed_points, MovedPoints(sigma_g));
                     fi;
                 if fixed_points > 1 or Maximum(CycleStructurePerm(sigma_g)) > 1 then 
-                possibleRs := TestConjugacyRelationships(g_t[i], h_t[i], possibleRs, current_level);
-                firstLevelRs := possibleRsFirstLevel(possibleRs, current_level);
+					if min_level_to_try = 1 then 
+						Print("\t Trying testConjugacyRelationships with:\n\t\tg = ", g_t[i], "\n\t\t h = ", h_t[i], "\n\n");
+					fi;
+                	possibleRs := TestConjugacyRelationships(g_t[i], h_t[i], possibleRs, current_level);
                 fi;
                 i := i + 1;
                 #Print("Elems remaining after a round of conjugacy relations: ", Length(possibleRs), "\n");
             od;
             #Print("Sigma_r remaining: ", possibleRs, "\n");
-            if Length(firstLevelRs) = 1 then 
-                #Print("Succeeded on level ", current_level, "\n");
-                return firstLevelRs[1];
-            fi;
+            for level in Reversed([1..current_level]) do 
+				if UniqueOnLevel(possibleRs, current_level, level) then 
+					return [level, PermActionOnLevel(possibleRs[1], current_level, level, 2)];
+				fi;
+			od;
         od;
         Print("Failed to recover action within" , max_level_to_try, " levels\n");
         return fail;
@@ -493,12 +500,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		return PermList(l);
 	end;
 
-	ElemsWithDistinctPerms := function(elems)
+	ElemsWithDistinctPerms := function(elems, recoveryLevel)
 		local perms_seen, indices_to_return, i, perm;
-		perms_seen := NewDictionary(PermOnLevel(elems[1], 1), false, SymmetricGroup(N_LETTERS));
+		perms_seen := NewDictionary(PermOnLevel(elems[1], 1), false, SymmetricGroup(N_LETTERS^recoveryLevel));
 		indices_to_return := [];
 		for i in [1..Length(elems)] do	
-			perm := PermOnLevel(elems[i], 1);
+			perm := PermOnLevel(elems[i], recoveryLevel);
 			if not KnowsDictionary(perms_seen, perm) then 
 				AddDictionary(perms_seen, perm);
 				Append(indices_to_return, [i]);
@@ -523,6 +530,41 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		return [g, h];
 	end;
 
+	PermActionAtVertex := function(perm, bigLevel, vertex)
+		local topLevelAction, permSplitLeftRight, topLevelSwap, singleSubtreePerm, permAsList, i, nextVertex;
+
+		topLevelAction := PermActionOnLevel(perm, bigLevel, 1, 2);
+		if vertex = [] then 
+			return topLevelAction;
+		fi;
+		if topLevelAction = () then 
+			permSplitLeftRight := perm;
+		else 
+			topLevelSwap := PermList(Concatenation([2^(bigLevel - 1) + 1..2^bigLevel], [1..2^(bigLevel-1)]));
+			permSplitLeftRight := perm * topLevelSwap;
+		fi;
+		if vertex[1] = 1 then 
+			singleSubtreePerm := RestrictedPermNC(permSplitLeftRight, [1..2^(bigLevel - 1)]);
+		else 
+			permAsList := ListPerm(permSplitLeftRight, 2^(bigLevel));
+			for i in [1..2^(bigLevel - 1)] do 
+				Remove(permAsList, 1);
+			od;
+			singleSubtreePerm := PermList(List([1..2^(bigLevel - 1)], i -> permAsList[i] - 2^(bigLevel - 1)));
+		fi;
+
+		nextVertex := ShallowCopy(vertex);
+		Remove(nextVertex, 1);
+		return PermActionAtVertex(singleSubtreePerm, bigLevel - 1, nextVertex);
+	end;
+
+	BuildPortrait := function(perm, recoveryLevel, depthForPortrait, currentVertex, sections)
+		if depthForPortrait = 1 then 
+			return Concatenation([PermActionAtVertex(perm, recoveryLevel, currentVertex)], sections);
+		fi;
+		return Concatenation([PermActionAtVertex(perm, recoveryLevel, currentVertex)], List([1..N_LETTERS], i -> BuildPortrait(perm, recoveryLevel, depthForPortrait - 1, Concatenation(currentVertex, [i]), List([(i-1)*N_LETTERS^(depthForPortrait - 1) + 1..i*N_LETTERS^(depthForPortrait - 1)], j -> sections[j]))));
+	end;
+
 	#Recover portrait of secret conjugator
 	ConjugatorPortrait:=function(short_g_list, short_h_list, key_length )
 		local portrait, ConjugatorPortraitRecursive, contracting_depth,
@@ -535,38 +577,48 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		# Recursively builds portrait of conjugator from lists of conjugate pairs
 		ConjugatorPortraitRecursive :=function(g_list, h_list, level)
 		
-			local sigma_r, sigma_gs, related_r_sections, elems_with_distinct_perms, set_of_related_r_sections, 
+			local recoveredAction, sigma_r, recoveryLevel, sigma_gs, related_r_sections, elems_with_distinct_perms, set_of_related_r_sections, 
 				i, new_g_list, new_h_list, g_h_index, sigma_g, sections_of_r, 
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
 				current_portrait_depth, j, section_index, portrait_of_r;
 
-			sigma_r := recoveringL1(g_list, h_list, Maximum(1, stabilizedLevels - level + 1), Maximum(1, stabilizedLevels - level + 1) + 4);
-			if sigma_r = fail then 
+			recoveredAction := recoveringL1(g_list, h_list, Maximum(1, stabilizedLevels - level + 1), Maximum(1, stabilizedLevels - level + 1) + 4);
+			if recoveredAction = fail then 
                 Print("Failed to recover action at a vertex on level ", level, "\n");
 				return fail;
 			fi;
 
+			recoveryLevel := recoveredAction[1];
+			Print("Recovery level is ", recoveryLevel, "\n");
+			sigma_r := recoveredAction[2];
+			Print("Sigma r is ", sigma_r, "\n");
+
+			#depth of portraits that we will be returned from recursive calls.
+			#At the end of this method, we will return a portrait of depth one more than this. 
 			current_portrait_depth := contracting_depth + nucleus_distinct_level - level;
-			if current_portrait_depth = 0 then
-				portrait_of_r :=  Concatenation([sigma_r], List([1..N_LETTERS], i -> [placeholder])); 
-				if nucleus_distinct_level = 1 then 
-					portrait_of_r := AssignNucleusElements(portrait_of_r, 1);
+			if current_portrait_depth < recoveryLevel then 
+				portrait_of_r := BuildPortrait(sigma_r, recoveryLevel, current_portrait_depth + 1, [], List([1..N_LETTERS^(current_portrait_depth + 1)], i -> [placeholder]));
+				if nucleus_distinct_level <= current_portrait_depth + 1 then 
+					portrait_of_r := AssignNucleusElements(portrait_of_r, current_portrait_depth + 1);
 				fi;
-                Print("Base case. Returning from level ", level, "\n");
+				if nucleus_distinct_level < current_portrait_depth + 1 then 
+					portrait_of_r := PrunePortrait(portrait_of_r);
+				fi;
+				Print("Base case. Returning from level ", level, "\n");
 				return portrait_of_r;
 			fi;
 
-			#If we get to this point, we know how r acts on the first level
+			#If we get to this point, we know how r acts on the first level(s)
 			#Now: figure out which sections of r we need to recover
-			sigma_gs := List(g_list, g -> PermOnLevel(g, 1));
-			orbits_under_sigma_gs := Orbits(Group(sigma_gs), [1..N_LETTERS]);
+			sigma_gs := List(g_list, g -> PermOnLevel(g, recoveryLevel));
+			orbits_under_sigma_gs := Orbits(Group(sigma_gs), [1..N_LETTERS^recoveryLevel]);
 			related_r_sections := ShallowCopy(orbits_under_sigma_gs); #original was immutable
 			SortBy(related_r_sections, orbit -> Length(orbit)); #arrange from smallest to largest
 
 			#Recover as many sections as needed and fill in the rest
-			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list);
+			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list, recoveryLevel);
 			sections_of_r := [];
 			for set_of_related_r_sections in related_r_sections do 
 				for section_index in [1..Length(set_of_related_r_sections)] do 
@@ -580,16 +632,16 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 						if IsOne(g) then
 							continue;
 						fi;
-						sigma_g := PermOnLevel(g, 1);
+						sigma_g := PermOnLevel(g, recoveryLevel);
 						h := h_list[g_h_index];
 						#if (a_1, ..., a_n) is a cycle in sigma_g and b_i = sigma_r(a_i) then
 						#(g_{a_1}...g_{a_n})^r_{a_1} = h_{b_1}...h_{b_n}
-						lhs := Section(g, i);
-						rhs := Section(h, i^sigma_r);
+						lhs := Sections(g, recoveryLevel)[i];
+						rhs := Sections(h, recoveryLevel)[i^sigma_r];
 						next := i^sigma_g;
 						while next <> i do 
-							lhs := lhs*Section(g, next);
-							rhs := rhs*Section(h, next^sigma_r);
+							lhs := lhs*Sections(g, recoveryLevel)[next];
+							rhs := rhs*Section(h, recoveryLevel)[next^sigma_r];
 							next := next^sigma_g;
 						od;
 						Append(new_g_list, [lhs]);
@@ -598,8 +650,8 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 					if Length(new_g_list) = 0 then	
 						return fail;
 					fi;
-                    Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
-					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
+                    Print("On level ", level, ", making recursive call to level ", level + recoveryLevel, ", section ", i, "\n");
+					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + recoveryLevel);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 
 							#could not recover any section in this set
@@ -612,7 +664,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 					fi;
 
 					#If we get here, we have the portrait of r_i.
-					#We need to express this as a tree automorphism to compute the other relevant sections.
+					#We need to compute the other relevant sections.
 					sections_of_r[i] := portrait_of_r_i;
 					new_r_sections := [i];
 					newer_r_sections := [];
@@ -621,14 +673,14 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 						for index in new_r_sections do 
 							for g_h_index in elems_with_distinct_perms do 
 								g := g_list[g_h_index];
-								sigma_g := PermOnLevel(g, 1);
+								sigma_g := PermOnLevel(g, recoveryLevel);
 								h := h_list[g_h_index];
-								sigma_h := PermOnLevel(h, 1);
+								sigma_h := PermOnLevel(h, recoveryLevel);
 								cycle_member := index^sigma_g;
 								h_index := index^sigma_r;
 								#g_{index}^-1 * r_{index} * h_{h_index}
 								if not (IsBound(sections_of_r[cycle_member])) then 
-									new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, index))), sections_of_r[index]), AutomPortrait(Section(h, h_index)));
+									new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Sections(g, recoveryLevel)[index])), sections_of_r[index]), AutomPortrait(Sections(h, recoveryLevel)[h_index]));
 									if level <= contracting_depth then 
 										new_section := AssignNucleusElements(new_section, current_portrait_depth);
 									fi;
@@ -650,7 +702,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 									h_index := h_index^sigma_h;
 									#g_{cycle_member}^-1 * new_section * h_{h_index}
 									if not (IsBound(sections_of_r[cycle_member^sigma_g])) then 
-										new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Section(g, cycle_member))), new_section), AutomPortrait(Section(h, h_index)));
+										new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Sections(g, recoveryLevel)[cycle_member])), new_section), AutomPortrait(Sections(h, recoveryLevel)[h_index]));
 										if level <= contracting_depth then 
 											new_section := AssignNucleusElements(new_section, current_portrait_depth);
 										fi;
@@ -681,7 +733,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			#If we get this far, we have recovered the action of r on the first level  
 			#as well as all of the sections. The last thing we need to do is convert
 			#these back into a portrait and return.
-			portrait_of_r := Concatenation([sigma_r], sections_of_r);
+			portrait_of_r := BuildPortrait(sigma_r, recoveryLevel, recoveryLevel, []. sections_of_r);
 			if level = contracting_depth + 1 then 
 				portrait_of_r := AssignNucleusElements(portrait_of_r, nucleus_distinct_level);
 			elif level < contracting_depth + 1 then 
@@ -718,8 +770,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	return ConjugatorPortrait(g_list, h_list, r_length);
 end;
 
-#A simplified example
-Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
+#Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 G := AutomatonGroup("a = (1, 1)(1, 2), b = (a, c), c = (b, 1)");
 
 RandomWordInGenerators := function(len, num_generators)
@@ -826,6 +877,7 @@ g_list := List([1..30], i -> RandomStabilizerIMGZ(3, 10, 10));
 R_LEN := 10;
 Print("gs chosen\n");
 r := RandomElement(R_LEN, G);
+Print("On level 7, r's permutation is ", PermOnLevel(r, 7), "\n");
 Print("r chosen\n");
 h_list := List(g_list, g -> r^-1*g*r);
 Print("hs calculated\n");

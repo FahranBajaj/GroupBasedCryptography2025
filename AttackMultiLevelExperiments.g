@@ -405,7 +405,35 @@ RandomElement := function(len, group)
     return RandomElementList(len - 5, len + 5, group, 1)[1];
 end;
 
-gs := List([1..30], i -> RandomStabilizerIMGZ(3, 10, 10));
-r := RandomElement(10, G);
-hs := List(gs, g -> g^r);
-recoveringL1(gs, hs, 3, 10);
+#gs := List([1..30], i -> RandomStabilizerIMGZ(3, 10, 10));
+#r := RandomElement(10, G);
+#hs := List(gs, g -> g^r);
+#recoveringL1(gs, hs, 3, 10);
+
+PermActionAtVertex := function(perm, bigLevel, vertex)
+    local topLevelAction, permSplitLeftRight, topLevelSwap, singleSubtreePerm, permAsList, i, nextVertex;
+
+    topLevelAction := PermActionOnLevel(perm, bigLevel, 1, 2);
+    if vertex = [] then 
+        return topLevelAction;
+    fi;
+    if topLevelAction = () then 
+        permSplitLeftRight := perm;
+    else 
+        topLevelSwap := PermList(Concatenation([2^(bigLevel - 1) + 1..2^bigLevel], [1..2^(bigLevel-1)]));
+        permSplitLeftRight := perm * topLevelSwap;
+    fi;
+    if vertex[1] = 0 then 
+        singleSubtreePerm := RestrictedPermNC(permSplitLeftRight, [1..2^(bigLevel - 1)]);
+    else 
+        permAsList := ListPerm(permSplitLeftRight, 2^(bigLevel));
+        for i in [1..2^(bigLevel - 1)] do 
+            Remove(permAsList, 1);
+        od;
+        singleSubtreePerm := PermList(List([1..2^(bigLevel - 1)], i -> permAsList[i] - 2^(bigLevel - 1)));
+    fi;
+
+    nextVertex := ShallowCopy(vertex);
+    Remove(nextVertex, 1);
+    return PermActionAtVertex(singleSubtreePerm, bigLevel - 1, nextVertex);
+end;

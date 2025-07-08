@@ -1,11 +1,11 @@
 LoadPackage("AutomGrp");
 
-TestOneGroup := function(degree, num_gens, p, max_nucleus_size, num_elms_to_try, section_depth, max_time)
+TestOneGroup := function(degree, num_gens, p, isFinite_time, findNucleus_time, isContracting_time)
     # degree: degree of tree, num_gens: # generators of tree, p: percentage of 1s (0-1)
     # num_elms_to_try: how many elements of the group to check if their order is infinite
     # section_depth: how far into the tree to go while checking if an elm's order is infinite
-    # max_time: in seconds
-    local new_autom_gr_fixed_ones_OG, new_autom_gr_fixed_ones, ElmOfInfiniteOrderTF, aut_gr, is_finite, nucleus_size, is_c, nucleus, inf_elm, timer_call;
+    # all times in minutes
+    local new_autom_gr_fixed_ones, nucleusSize, isContractingTF, aut_gr, is_finite, nucleus_size, is_c, nucleus, timer_call;
 
     # helper methods
     new_autom_gr_fixed_ones := function(T_d, numGenerators, oneProb)
@@ -72,11 +72,11 @@ TestOneGroup := function(degree, num_gens, p, max_nucleus_size, num_elms_to_try,
                     Append(currentGen, [elm]);
                 od;
 
-                Append(currentGen, [Random(Elements(S_d))]);  # appending random permutation!
+                Append(currentGen, [Random(S_d)]);  # appending random permutation!
 
                 if currentGen in generators then
                     Remove(currentGen, Length(currentGen));
-                    Append(currentGen, [Random(Elements(S_d))]);
+                    Append(currentGen, [Random(S_d)]);
                 fi;
 
                 Append(generators, [currentGen]);
@@ -92,16 +92,16 @@ TestOneGroup := function(degree, num_gens, p, max_nucleus_size, num_elms_to_try,
         return currentAut;
     end;
 
-    ElmOfInfiniteOrderTF := function(aut_gr, num_elms_to_try, section_depth)
-        local infElm;
+    nucleusSize := function(G)
+        return Size(GroupNucleus(G));
+    end;
 
-        infElm := FindElementOfInfiniteOrder(aut_gr, num_elms_to_try, section_depth);
+    isContractingTF := function(G)
+        local n;
 
-        if infElm <> fail then
-            return true;
-        fi;
+        n := FindNucleus(G,false);
 
-        return false;
+        return Length(n[1]);
     end;
 
     # getting your random autom group
@@ -111,90 +111,85 @@ TestOneGroup := function(degree, num_gens, p, max_nucleus_size, num_elms_to_try,
     nucleus_size := -1;
     is_c := false;
 
-    # check if it's contracting
-    nucleus := FindNucleus(aut_gr, max_nucleus_size, false);
+    # TODO: checking if finite
+    timer_call := IO_CallWithTimeoutList(rec(minutes := isFinite_time), IsFinite, [aut_gr]);
+    if timer_call[1] and timer_call[2] then
+        is_finite := "t";
+        is_c := true;
 
-    if nucleus <> fail then
+        # getting nucleus size
+        nucleus := IO_CallWithTimeoutList(rec(minutes := findNucleus_time), nucleusSize, [aut_gr]);
+
+        if nucleus[1] = true then     
+            nucleus_size := nucleus[2];
+        fi;
+
+        return [aut_gr, is_c, nucleus_size, is_finite];
+    fi;
+
+    # check if it's contracting (ADDED TIMER)
+    # nucleus := FindNucleus(aut_gr, max_nucleus_size, false);
+    nucleus := IO_CallWithTimeoutList(rec(minutes := isContracting_time), isContractingTF, [aut_gr]);
+
+    if nucleus[1] = true then
         # contracting! yay!
         is_c := true;
-        nucleus_size  := Length(nucleus[1]);
+        nucleus_size  := nucleus[2];
+        if timer_call[1] and not timer_call[2] then 
+            is_finite := "f";
+        else 
+            is_finite := "u";
+        fi;
+        return [aut_gr, is_c, nucleus_size, is_finite];
     else
         # not contracting
         is_finite := "nc";
         return [aut_gr, is_c, nucleus_size, is_finite]; # group, t/f contracting, nucleus size (-1 if nc), finite (nc: noncontracting)
     fi;
-
-    # if contracting, is the group infinite or finite?
-    
-    # checking if infinite
-
-    timer_call := IO_CallWithTimeoutList(rec(seconds := max_time), ElmOfInfiniteOrderTF, [aut_gr, num_elms_to_try, section_depth]);
-    
-    if timer_call[1] and timer_call[2] then
-        is_finite := "f";
-        return [aut_gr, is_c, nucleus_size, is_finite];
-    fi;
-
-    timer_call := IO_CallWithTimeoutList(rec(seconds := max_time), IsFractal, [aut_gr]);
-
-    if timer_call[1] and timer_call[2] then
-        is_finite := "f";
-        return [aut_gr, is_c, nucleus_size, is_finite];
-    fi;
-
-    # TODO: checking if finite
-    timer_call := IO_CallWithTimeoutList(rec(seconds := max_time), IsFinite, [aut_gr]);
-    if timer_call[1] and timer_call[2] then
-        is_finite := "t";
-        return [aut_gr, is_c, nucleus_size, is_finite];
-    fi;
-
-    # undetermined
-    is_finite := "u";
-    return [aut_gr, is_c, nucleus_size, is_finite];
 end;
+
 
 
 NUMBER_TRIALS := 100;
 DEGREE := 3;
 NUM_GENERATORS := 3;
 PROPORTION := 0.9;
+CHECK_FINITE_TIME := 1;
+FIND_NUCLEUS_TIME := 12;
 PROPORTION_STRING := "0.9";
-MAX_NUCLEUS_SIZE := 100;
-NUM_ELMS_TO_TRY := 20;
-SECTION_DEPTH := 5;
-MAX_TIME := 30;
+
 
 number_completed := 0;
 filePath := Concatenation("./ContractingGroupsFound/", String(DEGREE), "_", String(NUM_GENERATORS), "_", PROPORTION_STRING, ".g");
 contractingGroupsFile := OutputTextFile(filePath, true);
 logFile := OutputTextFile("ContractingGroupsFound/contractingGroupsLog.txt", true);
 AppendTo(filePath, "#--------------------NEW RUN--------------------\n");
-
+AppendTo(filePath, "groupsFound := [");
 numberContracting := 0;
+numberContractingAndFinite := 0;
 numberContractingAndInfinite := 0;
-numberContractingAndUnknown := 0;
 for trial in [1..NUMBER_TRIALS] do 
-    result := TestOneGroup(DEGREE, NUM_GENERATORS, PROPORTION, MAX_NUCLEUS_SIZE, NUM_ELMS_TO_TRY, SECTION_DEPTH, MAX_TIME);
+    result := TestOneGroup(DEGREE, NUM_GENERATORS, PROPORTION, CHECK_FINITE_TIME, FIND_NUCLEUS_TIME, FIND_NUCLEUS_TIME);
     if result[2] then 
         #group is contracting
         numberContracting := numberContracting + 1;
         if result[4] = "t" then 
             #group is finite
-            AppendTo(filePath, "G_", DEGREE, "_", NUM_GENERATORS, "_", PROPORTION_STRING, "_", numberContracting, " := rec(automaton := ", AutomatonList(result[1]), ", nucleusSize := ", result[3], ", infinite := false);\n");
+            AppendTo(filePath, "rec(automaton := ", AutomatonList(result[1]), ", nucleusSize := ", result[3], ", finite := true),\n");
+            numberContractingAndFinite := numberContractingAndFinite + 1;
         elif result[4] = "f" then 
             #group is infinite
-            AppendTo(filePath, "G_", DEGREE, "_", NUM_GENERATORS, "_", PROPORTION_STRING, "_", numberContracting, " := rec(automaton := ", AutomatonList(result[1]), ", nucleusSize := ", result[3], ", infinite := true);\n");
+            AppendTo(filePath, "rec(automaton := ", AutomatonList(result[1]), ", nucleusSize := ", result[3], ", finite := false),\n");
             numberContractingAndInfinite := numberContractingAndInfinite + 1;
         else 
-            #unknown whether finite or infinite
-            AppendTo(filePath, "G_", DEGREE, "_", NUM_GENERATORS, "_", PROPORTION_STRING, "_", numberContracting, " := rec(automaton := ", AutomatonList(result[1]), ", nucleusSize := ", result[3], ");\n");
-            numberContractingAndUnknown := numberContractingAndUnknown + 1;
+            #unkown whether group is finite or not
+            AppendTo(filePath, "rec(automaton := ", AutomatonList(result[1]), ", nucleusSize := ", result[3], "),\n");
         fi;
     fi;
     CloseStream(contractingGroupsFile);
     contractingGroupsFile := OutputTextFile(filePath, true);
 od;
-AppendTo("ContractingGroupsFound/contractingGroupsLog.txt", "For degree ", DEGREE, ", with ", NUM_GENERATORS, " generators and p = ", PROPORTION_STRING, ", ", numberContracting, " out of ", NUMBER_TRIALS, " groups were contracting, of which ", numberContractingAndInfinite, " were infinite and ", numberContractingAndUnknown, " were of unknown size.\n\n");
+AppendTo(filePath, "];");
+AppendTo("ContractingGroupsFound/contractingGroupsLog.txt", "For degree ", DEGREE, ", with ", NUM_GENERATORS, " generators and p = ", PROPORTION_STRING, ", ", numberContracting, " out of ", NUMBER_TRIALS, " groups were contracting, of which ", numberContractingAndFinite, " were found to be finite and ", numberContractingAndInfinite, " were found to be infinite.\n\n");
 CloseStream(contractingGroupsFile);
 CloseStream(logFile);

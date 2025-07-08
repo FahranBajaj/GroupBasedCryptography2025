@@ -526,7 +526,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 					fi;
 
 					#If we get here, we have the portrait of r_i.
-					#We need to express this as a tree automorphism to compute the other relevant sections.
+					#We need to compute the other relevant sections.
 					sections_of_r[i] := portrait_of_r_i;
 					new_r_sections := [i];
 					newer_r_sections := [];

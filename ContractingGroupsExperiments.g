@@ -1,5 +1,10 @@
 LoadPackage("AutomGrp");
 
+#------------------------------------------------------------
+#PHASE 1: generating groups, quickly checking if they are finite, 
+#then checking if contracting
+#------------------------------------------------------------
+
 TestOneGroup := function(degree, num_gens, p, isFinite_time, findNucleus_time, isContracting_time)
     # degree: degree of tree, num_gens: # generators of tree, p: percentage of 1s (0-1)
     # num_elms_to_try: how many elements of the group to check if their order is infinite
@@ -149,7 +154,8 @@ TestOneGroup := function(degree, num_gens, p, isFinite_time, findNucleus_time, i
 end;
 
 
-
+#DEGREE, NUM_GENERATORS, and PROPORTION change and a new process is 
+#run for each parameter set
 NUMBER_TRIALS := 100;
 DEGREE := 3;
 NUM_GENERATORS := 3;
@@ -193,3 +199,52 @@ AppendTo(filePath, "];");
 AppendTo("ContractingGroupsFound/contractingGroupsLog.txt", "For degree ", DEGREE, ", with ", NUM_GENERATORS, " generators and p = ", PROPORTION_STRING, ", ", numberContracting, " out of ", NUMBER_TRIALS, " groups were contracting, of which ", numberContractingAndFinite, " were found to be finite and ", numberContractingAndInfinite, " were found to be infinite.\n\n");
 CloseStream(contractingGroupsFile);
 CloseStream(logFile);
+
+#------------------------------------------------------------
+#PHASE 2: more in-depth check for finite size
+#------------------------------------------------------------
+
+#read in groups from files
+DEGREES := [3, 7, 12, 20];
+NUM_GENERATORS := [3, 7, 10];
+PROPORTIONS := ["0.3", "0.7", "0.9"];
+
+#dictionary allowing us to write groups to file in same order as read
+groupToIndex := NewDictionary(AutomatonGroup("a = (1, 1)"), true);
+groupsOfUnknownSize := [];
+
+for degree in DEGREES do
+    for num_generators in NUM_GENERATORS do 
+        for proportionString in PROPORTIONS do 
+            filePath := Concatenation("./ContractingGroupsFound/", String(degree), "_", String(num_generators), "_", proportionString, ".g");
+            #this file gives us the list groupsFound
+            Read(filePath);
+            for i in [1..Length(groupsFound)] do 
+                group := AutomatonGroup(groupsFound[i].automaton);
+                nucleusSize := groupsFound[i].nucleusSize;
+                if isBound(groupsFound[i].finite) then 
+                    AddDictionary(groupToIndex, rec(degree := degree, num_generators := num_generators, proportionString := proportionString, nucleusSize := nucleusSize, finite := groupsFound[i].finite));
+                else 
+                    AddDictionary(groupToIndex, rec(degree := degree, num_generators := num_generators, proportionString := proportionString, nucleusSize := nucleusSize));
+                    Append(groupsOfUnknownSize, [group]);
+                fi;
+            od;
+        od;
+    od;
+od;
+
+#first step: call isFractal for a while
+MAX_FRACTAL_TIME := 5;
+#reverse because we will be removing elements from the list 
+for i in Reversed([1..Length(groupsOfUnknownSize)]) do 
+    group := groupsOfUnknownSize[i];
+    timer_call := IO_CallWithTimeout(rec(minutes := MAX_FRACTAL_TIME), IsFractal, group);
+    if timer_call[1] and timer_call[2] then 
+        #group is infinite
+        remove(groupsOfUnknownSize, i);
+        record := LookupDictionary(groupToIndex, group);
+        record.finite := false;
+        AddDictionary(groupToIndex, group, record);
+    fi;
+od;
+

@@ -70,7 +70,7 @@ TestOneGroup := function(degree, num_gens, p, max_nucleus_size, num_elms_to_try,
                 Append(currentGen, [elm]);
             od;
 
-            Append(currentGen, [Random(Elements(S_d))]);  # appending random permutation!
+            Append(currentGen, [Random  (S_d))]);  # appending random permutation!
             Append(sections, [currentGen]);
         od;
 

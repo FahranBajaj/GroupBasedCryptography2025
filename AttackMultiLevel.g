@@ -106,7 +106,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
 		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
 		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation,
-		PruneSingleLevel, PermActionAtVertex, BuildPortrait;
+		PruneNLevels, PermActionAtVertex, BuildPortrait;
 
 	N_LETTERS := DegreeOfTree(G);
 
@@ -293,7 +293,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	recoveringL1 := function(g_t, h_t, min_level_to_try, max_level_to_try)
         local UniqueOnLevel, current_level, possibleRs, i, sigma_g, 
         fixed_points, level;
-
+		
         UniqueOnLevel := function(possibleRs, bigLevel, smallLevel)
 			local firstAction, i;
 
@@ -309,11 +309,10 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
         end;
 
         for current_level in [min_level_to_try..max_level_to_try] do 
-            Print("Attempting to recover action ", current_level, " levels down...\n");
+			Print("Attempting to recover the action ", current_level, " levels down\n");
             #Get possible sigma_r by looking at permutations that could conjugate all sigma_g/sigma_h pairs
             possibleRs := IntersectionOfConjugators(g_t, h_t, current_level);
-			Print("\tDone with intersection of conjugators\n");
-
+			Print("\tDone with intersection of conjugators. There are ", Length(possibleRs), " remaining permutations\n");
 			#this if statement will usually be false so may as well check it before
 			#looping through levels in reversed order
             if UniqueOnLevel(possibleRs, current_level, 1) then
@@ -333,10 +332,8 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
                         SubtractSet(fixed_points, MovedPoints(sigma_g));
                     fi;
                 if fixed_points > 1 or Maximum(CycleStructurePerm(sigma_g)) > 1 then 
-					if min_level_to_try = 1 then 
-						Print("\t Trying testConjugacyRelationships with:\n\t\tg = ", g_t[i], "\n\t\t h = ", h_t[i], "\n\n");
-					fi;
                 	possibleRs := TestConjugacyRelationships(g_t[i], h_t[i], possibleRs, current_level);
+					Print("\tAfter a round of testing conjugacy relationships, ", Length(possibleRs), " permutations remain.\n");
                 fi;
                 i := i + 1;
                 #Print("Elems remaining after a round of conjugacy relations: ", Length(possibleRs), "\n");
@@ -419,19 +416,23 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		return prune(portrait);
 	end;
 
-	PruneSingleLevel := function(portrait)
+	PruneNLevels := function(portrait, n)
 		local nucleus, nucleus_identified, prune;
 
 		nucleus := List(GroupNucleus(G), x-> [x]) ; 
 		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
 
-		prune := function(p) 
+		prune := function(p, n) 
 			local p_int , i ; 
 			p_int := [] ;
 			if p in nucleus then 
 				return p ;
 			else 
-				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> p[x+1])) ;
+				if n > 1 then 
+					p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1], n-1)));
+				else 
+					p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> p[x+1])) ;
+				fi;
 				for i in [1..Length(nucleus_identified)] do 
 						if p_int = nucleus_identified[i][2] then
 							return nucleus_identified[i][1];
@@ -441,7 +442,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			fi;
 		end;
 
-		return prune(portrait);
+		return prune(portrait, n);
 	end;
 
 	PortraitProduct := function(p1, p2)
@@ -591,9 +592,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			fi;
 
 			recoveryLevel := recoveredAction[1];
-			Print("Recovery level is ", recoveryLevel, "\n");
 			sigma_r := recoveredAction[2];
-			Print("Sigma r is ", sigma_r, "\n");
 
 			#depth of portraits that we will be returned from recursive calls.
 			#At the end of this method, we will return a portrait of depth one more than this. 
@@ -641,7 +640,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 						next := i^sigma_g;
 						while next <> i do 
 							lhs := lhs*Sections(g, recoveryLevel)[next];
-							rhs := rhs*Section(h, recoveryLevel)[next^sigma_r];
+							rhs := rhs*Sections(h, recoveryLevel)[next^sigma_r];
 							next := next^sigma_g;
 						od;
 						Append(new_g_list, [lhs]);
@@ -733,11 +732,11 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			#If we get this far, we have recovered the action of r on the first level  
 			#as well as all of the sections. The last thing we need to do is convert
 			#these back into a portrait and return.
-			portrait_of_r := BuildPortrait(sigma_r, recoveryLevel, recoveryLevel, []. sections_of_r);
+			portrait_of_r := BuildPortrait(sigma_r, recoveryLevel, recoveryLevel, [], sections_of_r);
 			if level = contracting_depth + 1 then 
 				portrait_of_r := AssignNucleusElements(portrait_of_r, nucleus_distinct_level);
 			elif level < contracting_depth + 1 then 
-				portrait_of_r := PruneSingleLevel(portrait_of_r);
+				portrait_of_r := PruneNLevels(portrait_of_r, recoveryLevel);
 			fi;
             Print("Successfully returning from level ", level, "\n");
 			return portrait_of_r;
@@ -770,7 +769,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	return ConjugatorPortrait(g_list, h_list, r_length);
 end;
 
-#Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
+Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 G := AutomatonGroup("a = (1, 1)(1, 2), b = (a, c), c = (b, 1)");
 
 RandomWordInGenerators := function(len, num_generators)
@@ -873,15 +872,14 @@ RandomStabilizerIMGZ := function(level, innerWordLength, conjugatorLength)
     return product;
 end;
 
-g_list := List([1..30], i -> RandomStabilizerIMGZ(3, 10, 10));
-R_LEN := 10;
+g_list := List([1..30], i -> RandomStabilizerIMGZ(4, 10, 10));
+R_LEN := 1000;
 Print("gs chosen\n");
 r := RandomElement(R_LEN, G);
-Print("On level 7, r's permutation is ", PermOnLevel(r, 7), "\n");
 Print("r chosen\n");
 h_list := List(g_list, g -> r^-1*g*r);
 Print("hs calculated\n");
-final := ConjugatorPortrait(G, g_list, h_list, R_LEN, 2, false, 0.1, 0, 0, 3); #r is probably not of length more than 20
+final := ConjugatorPortrait(G, g_list, h_list, R_LEN, 2, false, 0.1, 0, 0, 4); #r is probably not of length more than 20
 Print("r: ", r, "\n");
 Print("Portrait of r: ", AutomPortrait(r), "\n");
 Print("Portrait we found: ", final, "\n");

@@ -248,3 +248,74 @@ for i in Reversed([1..Length(groupsOfUnknownSize)]) do
     fi;
 od;
 
+AllElementsOfInfiniteOrder := function(MAX_ELM_INF_ORDER_TIME, depth, width)
+    # MAX_ELM_INF_ORDER_TIME: in HOURS
+    # depth: list with 4 integers in inc. order
+    # width: list with 4 integers in inc. order
+
+    local ElmOfInfiniteOrderTF, AllElmsOfInfiniteOrder, extra_time, times, j, i, group, timer_call, record;
+
+    # helper method
+    ElmOfInfiniteOrderTF := function(G, start, stop)
+        local tf;
+
+        tf := FindElementOfInfiniteOrder(G, start, stop);
+        if tf <> fail then
+            return true;
+        fi;
+        return false;
+    end;
+
+    AllElmsOfInfiniteOrder := function(startList, stopList, totalTime)
+        local initial_num, initial_time, times, i, group, extra_time, timer_call;
+
+        initial_num := Length(groupsOfUnknownSize)*1.0;
+        initial_time := totalTime/initial_num;
+        times := List([1..Length(groupsOfUnknownSize)], t -> initial_time);
+
+        for i in Reversed([1..Length(groupsOfUnknownSize)]) do 
+            group := groupsOfUnknownSize[i];
+            extra_time := Runtime();
+            timer_call := IO_CallWithTimeout(rec(hours := times[i]), ElmOfInfiniteOrderTF, group, depth[j], width[j]);
+            extra_time := Runtime() - extra_time;
+
+            # converting time to hours
+            extra_time := times[i] - extra_time * 0.001 / 3600.0;
+
+            if timer_call[1] and timer_call[2] then 
+                #group is infinite
+                Remove(groupsOfUnknownSize, i);
+                record := LookupDictionary(groupToIndex, group);
+                record.finite := false;
+                AddDictionary(groupToIndex, group, record);
+            fi;
+
+            if timer_call[1] <> false then
+                if 1.0*i <> 1.0 then
+                    extra_time := extra_time / (1.0*i - 1.0);
+                    times := List(times, t -> t + extra_time);
+                fi;
+            fi;
+        od;
+
+    end;
+
+    extra_time := 0;
+    times := List([1..4], i -> MAX_ELM_INF_ORDER_TIME*1.0);
+
+    for j in [1..4] do  # each h/d pair
+        extra_time := Runtime();
+        timer_call := IO_CallWithTimeout(rec(hours := times[j]), AllElmsOfInfiniteOrder, depth[j], width[j], times[j]);
+        extra_time := Runtime() - extra_time;
+
+        # converting time to hours and getting extra time
+        extra_time := times[j] - extra_time * 0.001 / 3600.0;
+
+        if j <> 4 then
+            extra_time := extra_time / (1.0*(4-j));
+            times := List(times, t -> t + extra_time);
+        fi;
+    od;
+end;
+
+AllElementsOfInfiniteOrder();

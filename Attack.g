@@ -205,86 +205,86 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	#Helper method to recover action of r on the first level. Takes one (g, h) pair and 
 	#possible sigma_r and tests the conjugacy relationships given by each sigma_r
 	TestConjugacyRelationships := function(g, h, candidate_sigma_r)
-        local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, size,
-            relationsToPerms, dictKeys, RotateProduct, sigma_r, orbits_of_size,
-            orbit, current_index, lhs, rhs, i, permsWithRelation, j, permsWithKey,
-            valid_sigma_r;
+		local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, size,
+			relationsToPerms, dictKeys, RotateProduct, sigma_r, orbits_of_size,
+			orbit, current_index, lhs, rhs, i, permsWithRelation, j, permsWithKey,
+			valid_sigma_r;
 
-        sigma_g := PermOnLevel(g, 1);
-        cycle_structure := CycleStructurePerm(sigma_g);
-        orbits := OrbitsPerms([sigma_g], [1..N_LETTERS]);
-        sizesWithMultipleCycles := []; 
-        if N_LETTERS - Length(MovedPoints(sigma_g)) > 1 then 
-            Append(sizesWithMultipleCycles, [1]);
-        fi;
-        for size in [1..Length(cycle_structure)] do
-            if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
-                #cycle_structure[1] is number of cycles of length 2
-                Append(sizesWithMultipleCycles, [size + 1]);
-            fi;
-        od;
+		sigma_g := PermOnLevel(g, 1);
+		cycle_structure := CycleStructurePerm(sigma_g);
+		orbits := OrbitsPerms([sigma_g], [1..N_LETTERS]);
+		sizesWithMultipleCycles := []; 
+		if N_LETTERS - Length(MovedPoints(sigma_g)) > 1 then 
+			Append(sizesWithMultipleCycles, [1]);
+		fi;
+		for size in [1..Length(cycle_structure)] do
+			if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
+				#cycle_structure[1] is number of cycles of length 2
+				Append(sizesWithMultipleCycles, [size + 1]);
+			fi;
+		od;
 
-        relationsToPerms := NewDictionary([[1], [1]], true);
-        dictKeys := [];
+		relationsToPerms := NewDictionary([[1], [1]], true);
+		dictKeys := [];
 
-        #Helper method to put each relation g_{i1}g_{i2}...g_{in} ~ h_{j1}h_{j2}...h{jn}
-        #into a canonical form where the smallest index comes first.
-        RotateProduct := function(factors)
-            local min;
-            min := Minimum(factors);
-            while factors[1] <> min do 
-                Append(factors, [factors[1]]);
-                Remove(factors, 1);
-            od;
-        end;
+		#Helper method to put each relation g_{i1}g_{i2}...g_{in} ~ h_{j1}h_{j2}...h{jn}
+		#into a canonical form where the smallest index comes first.
+		RotateProduct := function(factors)
+			local min;
+			min := Minimum(factors);
+			while factors[1] <> min do 
+				Append(factors, [factors[1]]);
+				Remove(factors, 1);
+			od;
+		end;
 
-        for sigma_r in candidate_sigma_r do
-            for size in sizesWithMultipleCycles do
-                orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
-                for orbit in orbits_of_size do
-                    current_index := orbit[1];
-                    lhs := [];
-                    rhs := [];
-                    for i in [1..size] do 
-                        Append(lhs, [current_index]);
-                        Append(rhs, [current_index^sigma_r]);
-                        current_index := current_index^sigma_g;
-                    od;
-                    RotateProduct(lhs);
-                    RotateProduct(rhs);
-                    if KnowsDictionary(relationsToPerms, [lhs, rhs]) then 
-                        Append(LookupDictionary(relationsToPerms, [lhs, rhs]), [sigma_r]);
-                    else 
-                        AddDictionary(relationsToPerms, [lhs, rhs], [sigma_r]);
-                        Append(dictKeys, [[lhs, rhs]]);
-                    fi;
-                od;
-            od;
-        od;
+		for sigma_r in candidate_sigma_r do
+			for size in sizesWithMultipleCycles do
+				orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
+				for orbit in orbits_of_size do
+					current_index := orbit[1];
+					lhs := [];
+					rhs := [];
+					for i in [1..size] do 
+						Append(lhs, [current_index]);
+						Append(rhs, [current_index^sigma_r]);
+						current_index := current_index^sigma_g;
+					od;
+					RotateProduct(lhs);
+					RotateProduct(rhs);
+					if KnowsDictionary(relationsToPerms, [lhs, rhs]) then 
+						Append(LookupDictionary(relationsToPerms, [lhs, rhs]), [sigma_r]);
+					else 
+						AddDictionary(relationsToPerms, [lhs, rhs], [sigma_r]);
+						Append(dictKeys, [[lhs, rhs]]);
+					fi;
+				od;
+			od;
+		od;
 
-        #sizesWithMultipleCycles is increasing, so 
-        #dictKeys is already sorted from short relations to long ones. 
-        i := 1;
-        valid_sigma_r := ShallowCopy(candidate_sigma_r);
-        while Length(valid_sigma_r)  > 1 and i <= Length(dictKeys) do 
-            lhs := Product(List(dictKeys[i][1], index -> Sections(g)[index]));
-            rhs := Product(List(dictKeys[i][2], index -> Sections(h)[index]));
-            if AreNotConjugateOnLevel(lhs, rhs, 2) then 
-                permsWithRelation := LookupDictionary(relationsToPerms, dictKeys[i]);
-                SubtractSet(valid_sigma_r, permsWithRelation);
-                #looping backwards because we will remove elements of dictKeys
-                for j in Reversed([i+1..Length(dictKeys)]) do 
-                    permsWithKey := LookupDictionary(relationsToPerms, dictKeys[i]);
-                    SubtractSet(permsWithKey, permsWithRelation);
-                    if Length(permsWithKey) = 0 then 
-                        Remove(dictKeys, j);
-                    fi;
-                od;
-            fi;
-            i := i + 1;
-        od;
-        return valid_sigma_r;
-    end;
+		#sizesWithMultipleCycles is increasing, so 
+		#dictKeys is already sorted from short relations to long ones. 
+		i := 1;
+		valid_sigma_r := ShallowCopy(candidate_sigma_r);
+		while Length(valid_sigma_r)  > 1 and i <= Length(dictKeys) do 
+			lhs := Product(List(dictKeys[i][1], index -> Section(g, index)));
+			rhs := Product(List(dictKeys[i][2], index -> Section(h, index)));
+			if AreNotConjugateOnLevel(lhs, rhs, 2) then 
+				permsWithRelation := LookupDictionary(relationsToPerms, dictKeys[i]);
+				SubtractSet(valid_sigma_r, permsWithRelation);
+				#looping backwards because we will remove elements of dictKeys
+				for j in Reversed([i+1..Length(dictKeys)]) do 
+					permsWithKey := LookupDictionary(relationsToPerms, dictKeys[j]);
+					SubtractSet(permsWithKey, permsWithRelation);
+					if Length(permsWithKey) = 0 then 
+						Remove(dictKeys, j);
+					fi;
+				od;
+			fi;
+			i := i + 1;
+		od;
+		return valid_sigma_r;
+	end;
 	
 	recoveringL1 := function(g_t, h_t)
 		local possibleRs, i, sigma_g, fixed_points;

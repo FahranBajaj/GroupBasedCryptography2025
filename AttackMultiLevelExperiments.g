@@ -114,7 +114,7 @@ TestConjugacyRelationships := function(g, h, candidate_sigma_r, level)
             SubtractSet(valid_sigma_r, permsWithRelation);
             #looping backwards because we will remove elements of dictKeys
             for j in Reversed([i+1..Length(dictKeys)]) do 
-                permsWithKey := LookupDictionary(relationsToPerms, dictKeys[i]);
+                permsWithKey := LookupDictionary(relationsToPerms, dictKeys[j]);
                 SubtractSet(permsWithKey, permsWithRelation);
                 if Length(permsWithKey) = 0 then 
                     Remove(dictKeys, j);

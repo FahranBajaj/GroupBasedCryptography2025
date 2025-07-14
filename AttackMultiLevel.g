@@ -182,7 +182,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 		centralizer := Centralizer(G, g); # centralizer of g
 		r := RepresentativeAction(G, g, h, CONJUGATION_ACTION);
-		return Elements(RightCoset(centralizer, r));
+		return RightCoset(centralizer, r);
 	end;
 
 	IntersectionOfConjugators := function(g_t, h_t, level)
@@ -208,111 +208,135 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	#Helper method to recover action of r on the first level. Takes one (g, h) pair and 
 	#possible sigma_r and tests the conjugacy relationships given by each sigma_r
 	TestConjugacyRelationships := function(g, h, candidate_sigma_r, level)
-        local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, size,
-            relationsToPerms, dictKeys, RotateProduct, sigma_r, orbits_of_size,
-            orbit, current_index, lhs, rhs, i, permsWithRelation, j, permsWithKey,
-            valid_sigma_r;
+		local sigma_g, cycle_structure, orbits, sizesWithMultipleCycles, size,
+			relationsToPerms, dictKeys, RotateProduct, sigma_r, orbits_of_size,
+			orbit, current_index, lhs, rhs, i, permsWithRelation, j, permsWithKey,
+			valid_sigma_r;
 
-        sigma_g := PermOnLevel(g, level);
-        cycle_structure := CycleStructurePerm(sigma_g);
-        orbits := OrbitsPerms([sigma_g], [1..N_LETTERS^level]);
-        sizesWithMultipleCycles := []; 
-        if N_LETTERS^level - Length(MovedPoints(sigma_g)) > 1 then 
-            Append(sizesWithMultipleCycles, [1]);
-        fi;
-        for size in [1..Length(cycle_structure)] do
-            if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
-                #cycle_structure[1] is number of cycles of length 2
-                Append(sizesWithMultipleCycles, [size + 1]);
-            fi;
-        od;
+		sigma_g := PermOnLevel(g, level);
+		cycle_structure := CycleStructurePerm(sigma_g);
+		orbits := OrbitsPerms([sigma_g], [1..N_LETTERS^level]);
+		sizesWithMultipleCycles := []; 
+		if N_LETTERS^level - Length(MovedPoints(sigma_g)) > 1 then 
+			Append(sizesWithMultipleCycles, [1]);
+		fi;
+		for size in [1..Length(cycle_structure)] do
+			if IsBound(cycle_structure[size]) and cycle_structure[size] > 1 then 
+				#cycle_structure[1] is number of cycles of length 2
+				Append(sizesWithMultipleCycles, [size + 1]);
+			fi;
+		od;
 
-        relationsToPerms := NewDictionary([[1], [1]], true);
-        dictKeys := [];
+		relationsToPerms := NewDictionary([[1], [1]], true);
+		dictKeys := [];
 
-        #Helper method to put each relation g_{i1}g_{i2}...g_{in} ~ h_{j1}h_{j2}...h{jn}
-        #into a canonical form where the smallest index comes first.
-        RotateProduct := function(factors)
-            local min;
-            min := Minimum(factors);
-            while factors[1] <> min do 
-                Append(factors, [factors[1]]);
-                Remove(factors, 1);
-            od;
-        end;
+		#Helper method to put each relation g_{i1}g_{i2}...g_{in} ~ h_{j1}h_{j2}...h{jn}
+		#into a canonical form where the smallest index comes first.
+		RotateProduct := function(factors)
+			local min;
+			min := Minimum(factors);
+			while factors[1] <> min do 
+				Append(factors, [factors[1]]);
+				Remove(factors, 1);
+			od;
+		end;
 
-        for sigma_r in candidate_sigma_r do
-            for size in sizesWithMultipleCycles do
-                orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
-                for orbit in orbits_of_size do
-                    current_index := orbit[1];
-                    lhs := [];
-                    rhs := [];
-                    for i in [1..size] do 
-                        Append(lhs, [current_index]);
-                        Append(rhs, [current_index^sigma_r]);
-                        current_index := current_index^sigma_g;
-                    od;
-                    RotateProduct(lhs);
-                    RotateProduct(rhs);
-                    if KnowsDictionary(relationsToPerms, [lhs, rhs]) then 
-                        Append(LookupDictionary(relationsToPerms, [lhs, rhs]), [sigma_r]);
-                    else 
-                        AddDictionary(relationsToPerms, [lhs, rhs], [sigma_r]);
-                        Append(dictKeys, [[lhs, rhs]]);
-                    fi;
-                od;
-            od;
-        od;
+		for sigma_r in candidate_sigma_r do
+			for size in sizesWithMultipleCycles do
+				orbits_of_size := Filtered(orbits, orbit -> Length(orbit) = size);
+				for orbit in orbits_of_size do
+					current_index := orbit[1];
+					lhs := [];
+					rhs := [];
+					for i in [1..size] do 
+						Append(lhs, [current_index]);
+						Append(rhs, [current_index^sigma_r]);
+						current_index := current_index^sigma_g;
+					od;
+					RotateProduct(lhs);
+					RotateProduct(rhs);
+					if KnowsDictionary(relationsToPerms, [lhs, rhs]) then 
+						Append(LookupDictionary(relationsToPerms, [lhs, rhs]), [sigma_r]);
+					else 
+						AddDictionary(relationsToPerms, [lhs, rhs], [sigma_r]);
+						Append(dictKeys, [[lhs, rhs]]);
+					fi;
+				od;
+			od;
+		od;
 
-        #sizesWithMultipleCycles is increasing, so 
-        #dictKeys is already sorted from short relations to long ones. 
-        i := 1;
-        valid_sigma_r := ShallowCopy(candidate_sigma_r);
-        while Length(valid_sigma_r)  > 1 and i <= Length(dictKeys) do 
-            lhs := Product(List(dictKeys[i][1], index -> Sections(g, level)[index]));
-            rhs := Product(List(dictKeys[i][2], index -> Sections(h, level)[index]));
-            if AreNotConjugateOnLevel(lhs, rhs, 2) then 
-                permsWithRelation := LookupDictionary(relationsToPerms, dictKeys[i]);
-                SubtractSet(valid_sigma_r, permsWithRelation);
-                #looping backwards because we will remove elements of dictKeys
-                for j in Reversed([i+1..Length(dictKeys)]) do 
-                    permsWithKey := LookupDictionary(relationsToPerms, dictKeys[i]);
-                    SubtractSet(permsWithKey, permsWithRelation);
-                    if Length(permsWithKey) = 0 then 
-                        Remove(dictKeys, j);
-                    fi;
-                od;
-            fi;
-            i := i + 1;
-        od;
-        return valid_sigma_r;
-    end;
+		#sizesWithMultipleCycles is increasing, so 
+		#dictKeys is already sorted from short relations to long ones. 
+		i := 1;
+		valid_sigma_r := ShallowCopy(candidate_sigma_r);
+		while Length(valid_sigma_r)  > 1 and i <= Length(dictKeys) do 
+			lhs := Product(List(dictKeys[i][1], index -> Sections(g, level)[index]));
+			rhs := Product(List(dictKeys[i][2], index -> Sections(h, level)[index]));
+			if i mod 10 = 0 then 
+				Print("\t\tAfter testing ", i, " relationships, ", Length(valid_sigma_r), " candidate permutations remain.\n");
+			fi;
+			if AreNotConjugateOnLevel(lhs, rhs, 2) then 
+				permsWithRelation := LookupDictionary(relationsToPerms, dictKeys[i]);
+				SubtractSet(valid_sigma_r, permsWithRelation);
+				#looping backwards because we will remove elements of dictKeys
+				for j in Reversed([i+1..Length(dictKeys)]) do 
+					permsWithKey := LookupDictionary(relationsToPerms, dictKeys[j]);
+					SubtractSet(permsWithKey, permsWithRelation);
+					if Length(permsWithKey) = 0 then 
+						Remove(dictKeys, j);
+					fi;
+				od;
+			fi;
+			i := i + 1;
+		od;
+		return valid_sigma_r;
+	end;
         
 
-	recoveringL1 := function(g_t, h_t, min_level_to_try, max_level_to_try)
+	recoveringL1 := function(g_t, h_t, currentLevelOfAttack)
         local UniqueOnLevel, current_level, possibleRs, i, sigma_g, 
         fixed_points, level;
 		
         UniqueOnLevel := function(possibleRs, bigLevel, smallLevel)
-			local firstAction, i;
+			local firstAction, i, numberTrivial, numberNonTrivial, toReturn;
 
+			#lines with hashtag at end are temporary to print something I'm interested in
+			#same with local variables numberTrivial, numberNontrivial, toReturn
+			numberTrivial := 0; #
+			numberNonTrivial := 0; #
             firstAction := PermActionOnLevel(possibleRs[1], bigLevel, smallLevel, 2);
+			if PermActionOnLevel(possibleRs[1], bigLevel, 1, 2) = One(SymmetricGroup(2)) then #
+					numberTrivial := numberTrivial + 1; #
+				else #
+					numberNonTrivial := numberNonTrivial + 1; #
+				fi; #
 			i := 2;
+			toReturn := true; #
 			while i <= Length(possibleRs) do 
+				if PermActionOnLevel(possibleRs[i], bigLevel, 1, 2) = One(SymmetricGroup(2)) then #
+					numberTrivial := numberTrivial + 1; #
+				else #
+					numberNonTrivial := numberNonTrivial + 1; #
+				fi; #
 				if PermActionOnLevel(possibleRs[i], bigLevel, smallLevel, 2) <> firstAction then 
-					return false;
-				fi;
+					toReturn := false;
+				fi; #
 				i := i + 1;
 			od;
-			return true;
+			Print("\t\tnumberTrivial: ", numberTrivial, ", numberNonTrivial: ", numberNonTrivial, "\n");
+			return toReturn;
         end;
 
-        for current_level in [min_level_to_try..max_level_to_try] do 
+        for current_level in [Maximum(1, stabilizedLevels - currentLevelOfAttack)..Maximum(1, stabilizedLevels - currentLevelOfAttack) + 4] do 
 			Print("Attempting to recover the action ", current_level, " levels down\n");
             #Get possible sigma_r by looking at permutations that could conjugate all sigma_g/sigma_h pairs
-            possibleRs := IntersectionOfConjugators(g_t, h_t, current_level);
-			Print("\tDone with intersection of conjugators. There are ", Length(possibleRs), " remaining permutations\n");
+			#This is only useful if we are on a deep enough level that permutations will be nontrivial
+			if current_level >= stabilizedLevels - currentLevelOfAttack + 2 then 
+				possibleRs := IntersectionOfConjugators(g_t, h_t, current_level);
+			else 
+				possibleRs := Elements(PermGroupOnLevel(G, current_level));
+			fi;
+			Print("\tFinished or skipped intersection of conjugators. There are ", Length(possibleRs), " remaining permutations\n");
 			#this if statement will usually be false so may as well check it before
 			#looping through levels in reversed order
             if UniqueOnLevel(possibleRs, current_level, 1) then
@@ -339,13 +363,16 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
                 #Print("Elems remaining after a round of conjugacy relations: ", Length(possibleRs), "\n");
             od;
             #Print("Sigma_r remaining: ", possibleRs, "\n");
-            for level in Reversed([1..current_level]) do 
-				if UniqueOnLevel(possibleRs, current_level, level) then 
-					return [level, PermActionOnLevel(possibleRs[1], current_level, level, 2)];
-				fi;
-			od;
+            if UniqueOnLevel(possibleRs, current_level, 1) then
+                for level in Reversed([2..current_level]) do 
+					if UniqueOnLevel(possibleRs, current_level, level) then 
+						return [level, PermActionOnLevel(possibleRs[1], current_level, level, 2)];
+					fi;
+				od;
+				return [1, PermActionOnLevel(possibleRs[1], current_level, 1, 2)];
+            fi;
         od;
-        Print("Failed to recover action within" , max_level_to_try, " levels\n");
+        Print("Failed to recover action within several levels\n");
         return fail;
     end;
 
@@ -578,14 +605,15 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		# Recursively builds portrait of conjugator from lists of conjugate pairs
 		ConjugatorPortraitRecursive :=function(g_list, h_list, level)
 		
-			local recoveredAction, sigma_r, recoveryLevel, sigma_gs, related_r_sections, elems_with_distinct_perms, set_of_related_r_sections, 
-				i, new_g_list, new_h_list, g_h_index, sigma_g, sections_of_r, 
+			local recoveredAction, sigma_r, recoveryLevel, sigma_gs, related_r_sections, 
+				onlyPruneNew, elems_with_distinct_perms, set_of_related_r_sections, i, 
+				new_g_list, new_h_list, g_h_index, sigma_g, sections_of_r, 
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
 				current_portrait_depth, j, section_index, portrait_of_r;
 
-			recoveredAction := recoveringL1(g_list, h_list, Maximum(1, stabilizedLevels - level + 1), Maximum(1, stabilizedLevels - level + 1) + 4);
+			recoveredAction := recoveringL1(g_list, h_list, level);
 			if recoveredAction = fail then 
                 Print("Failed to recover action at a vertex on level ", level, "\n");
 				return fail;
@@ -615,6 +643,12 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			orbits_under_sigma_gs := Orbits(Group(sigma_gs), [1..N_LETTERS^recoveryLevel]);
 			related_r_sections := ShallowCopy(orbits_under_sigma_gs); #original was immutable
 			SortBy(related_r_sections, orbit -> Length(orbit)); #arrange from smallest to largest
+
+			if level + recoveryLevel <= contracting_depth + 1 then 
+				onlyPruneNew := true;
+			else 
+				onlyPruneNew := false;
+			fi;
 
 			#Recover as many sections as needed and fill in the rest
 			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list, recoveryLevel);
@@ -680,10 +714,10 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 								#g_{index}^-1 * r_{index} * h_{h_index}
 								if not (IsBound(sections_of_r[cycle_member])) then 
 									new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Sections(g, recoveryLevel)[index])), sections_of_r[index]), AutomPortrait(Sections(h, recoveryLevel)[h_index]));
-									if level <= contracting_depth then 
+									if onlyPruneNew then 
 										new_section := AssignNucleusElements(new_section, current_portrait_depth);
 									fi;
-									if level < contracting_depth then 
+									if onlyPruneNew then 
 										new_section := PrunePortrait(new_section);
 									fi;
 								else 
@@ -702,10 +736,10 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 									#g_{cycle_member}^-1 * new_section * h_{h_index}
 									if not (IsBound(sections_of_r[cycle_member^sigma_g])) then 
 										new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Sections(g, recoveryLevel)[cycle_member])), new_section), AutomPortrait(Sections(h, recoveryLevel)[h_index]));
-										if level <= contracting_depth then 
+										if onlyPruneNew then 
 											new_section := AssignNucleusElements(new_section, current_portrait_depth);
 										fi;
-										if level < contracting_depth then 
+										if onlyPruneNew then 
 											new_section := PrunePortrait(new_section);
 										fi;
 									else 
@@ -733,10 +767,13 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			#as well as all of the sections. The last thing we need to do is convert
 			#these back into a portrait and return.
 			portrait_of_r := BuildPortrait(sigma_r, recoveryLevel, recoveryLevel, [], sections_of_r);
-			if level = contracting_depth + 1 then 
-				portrait_of_r := AssignNucleusElements(portrait_of_r, nucleus_distinct_level);
-			elif level < contracting_depth + 1 then 
+			if onlyPruneNew then 
 				portrait_of_r := PruneNLevels(portrait_of_r, recoveryLevel);
+			elif level <= contracting_depth + 1 then 
+				portrait_of_r := AssignNucleusElements(portrait_of_r, current_portrait_depth + 1);
+				if level < contracting_depth + 1 then 
+					portrait_of_r := PrunePortrait(portrait_of_r);
+				fi;
 			fi;
             Print("Successfully returning from level ", level, "\n");
 			return portrait_of_r;
@@ -879,7 +916,7 @@ r := RandomElement(R_LEN, G);
 Print("r chosen\n");
 h_list := List(g_list, g -> r^-1*g*r);
 Print("hs calculated\n");
-final := ConjugatorPortrait(G, g_list, h_list, R_LEN, 2, false, 0.1, 0, 0, 4); #r is probably not of length more than 20
+final := ConjugatorPortrait(G, g_list, h_list, R_LEN, 2, false, 0.1, 0, 0, 5); #r is probably not of length more than 20
 Print("r: ", r, "\n");
 Print("Portrait of r: ", AutomPortrait(r), "\n");
 Print("Portrait we found: ", final, "\n");

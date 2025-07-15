@@ -178,8 +178,11 @@ for j in [1..d] do
         lift_power := j;
         break;
     fi;
+
+    power := v[1];
 od;
 
+# fixme
 CONJUGATOR_LIFTING_DICTIONARY := NewDictionary(1, true);
 AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, 1, List([1..lift_power], i -> 2));
 b_lift := List([1..(d-1)], i -> 1);

@@ -1,5 +1,7 @@
 LoadPackage("AutomGrp");
 CONJUGATION_ACTION := OnPoints; # action is conjugation
+callsToRecoveringL1 := 0;
+callsToTestConjugacy := 0;
 
 NoRepeats := function(L)
 	local i, j, no_repeats;
@@ -17,14 +19,14 @@ NoRepeats := function(L)
 	return no_repeats;
 end;
 
-ConjugatorPortrait := function (G, g_list, h_list, contracting_depth, extended_word_length, num_new_pairs)
+ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracting_depth)
 
 	local N_LETTERS, nucleus, placeholder, AreNotConjugateOnLevel, nucleus_distinct_level,
 		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
 		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
 		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
 		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation,
-		PruneSingleLevel, callsToRecoveringL1, callsToTestConjugacy;
+		PruneSingleLevel, functionOutput;
 
 	N_LETTERS := DegreeOfTree(G);
 
@@ -208,7 +210,8 @@ ConjugatorPortrait := function (G, g_list, h_list, contracting_depth, extended_w
 				return nucleus[i];
 			fi;
 		od;
-		Error("Did not reach element of the nucleus at contracting_depth");	
+		#Error("Did not reach element of the nucleus at contracting_depth");	
+		return nucleus[1];
 	end;
 
 	#given portrait with a bunch of placeholders, replace with nucleus elements
@@ -362,10 +365,11 @@ ConjugatorPortrait := function (G, g_list, h_list, contracting_depth, extended_w
 	end;
 
 	#Recover portrait of secret conjugator
-	ConjugatorPortrait:=function(short_g_list, short_h_list, key_length)
+	ConjugatorPortrait:=function(short_g_list, short_h_list)
 		local portrait, ConjugatorPortraitRecursive, gs_hs_to_multiply, 
-            new_g_list, new_h_list, i, idxs, gs, hs;
+            new_g_list, new_h_list, i, idxs, gs, hs, runtime;
 
+		runtime := Runtime();
 		# Recursively builds portrait of conjugator from lists of conjugate pairs
 		ConjugatorPortraitRecursive :=function(g_list, h_list, level)
 		
@@ -523,6 +527,12 @@ ConjugatorPortrait := function (G, g_list, h_list, contracting_depth, extended_w
 
 		new_g_list := [];	
 		new_h_list := [];	
+		num_new_pairs := 50;
+		if g_length <= r_length then 
+			extended_word_length := Int(Ceil(Float(conj_length/g_length))); 
+		else
+			extended_word_length := 2;
+		fi;
 
 		for i in [1..num_new_pairs] do
 			idxs := List( [1..extended_word_length], x -> Random([1..Size(short_g_list)]) );
@@ -538,15 +548,14 @@ ConjugatorPortrait := function (G, g_list, h_list, contracting_depth, extended_w
 		Append(new_g_list, short_g_list);
 		Append(new_h_list, short_h_list);
 
-        callsToRecoveringL1 := 0;
-        callsToTestConjugacy := 0;
 		portrait := ConjugatorPortraitRecursive(new_g_list, new_h_list, 1);
 		if portrait = fail then 
 			return fail;
 		fi;
-		return [portrait, callsToRecoveringL1, callsToTestConjugacy];
+		runtime := Runtime() - runtime;
+		return [portrait, runtime];
 	end; # End of ConjugatorPortrait
-	return ConjugatorPortrait(g_list, h_list, r_length);
+	return ConjugatorPortrait(g_list, h_list);
 end;
 
 RandomElementList := function(len, group, list_size)
@@ -568,3 +577,59 @@ end;
 RandomElement := function(len, group)
     return RandomElementList(len, group, 1)[1];
 end;
+
+Read("./ContractingGroupsFound/GroupsToTestAttack.g");
+csvForResults := OutputTextFile("AttackResults.csv", true);
+incorrectResults := OutputTextFile("IncorrectResults.g", true);
+
+GROUP_REC := ; 
+GROUP_STRING := ;
+G_LENGTHS := [10, 100];
+R_LENGTHS := [10, 100];
+LIST_SIZES := [10];
+
+G := AutomatonGroup(GROUP_REC.automaton);
+nucleusSize := GROUP_REC.nucleusSize;
+
+for r_length in R_LENGTHS do
+	if not LookupDictionary(feasibilities, [GROUP_REC, r_length]) then	
+		continue;
+	fi;
+	contracting_depth := LookupDictionary(depthBounds, [GROUP_REC, r_length]);
+	contractingDepthTime := LookupDictionary(depthTimes, [GROUP_REC, r_length]);
+	for g_length in G_LENGTHS do 
+		if not LookupDictionary(feasibilities, [GROUP_REC, g_length]) then	
+			continue;
+		fi;
+		for list_size in LIST_SIZES do 
+			gs := RandomElementList(g_length, G, list_size);
+			r := RandomElement(r_length, G);
+			hs := List(gs, g -> g^r);
+			callsToRecoveringL1 := 0;
+			callsToTestConjugacy := 0;
+			functionResult := IO_CallWithTimeout(rec(hours := 1), ConjugatorPortrait, G, gs, hs, g_length, r_length, contracting_depth);
+			dataRow := Concatenation(GROUP_STRING, ",", String(nucleusSize), ",", String(g_length), ",", String(r_length), ",", String(list_size), ",", String(contracting_depth), ",", String(contractingDepthTime));
+			if functionResult[1] then 
+				#didn't time out
+				if functionResult[2][1] = fail then 
+					#failed
+					dataRow := Concatenation(dataRow, ",0,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(functionResult[2][2]), "\n");
+				elif functionResult[2][1] = AutomPortrait(r) then 
+					#function output was correct
+					dataRow := Concatenation(dataRow, ",1,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(functionResult[2][2]), "\n");
+				else 
+					#function returned an incorrect portrait
+					AppendTo("IncorrectResults.g", "rec(G := ", G, ", gs := ", gs, ", hs := ", hs, ", g_length := ", g_length, ", r_length := ", r_length, ", contracting_depth := ", contracting_depth, "), ");
+					dataRow := Concatenation(dataRow, ",-2,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(functionResult[2][2]), "\n");
+				fi;
+			else 
+				#we timed out
+				dataRow := Concatenation(dataRow, ",-1,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), "\n");
+			fi;
+			AppendTo("AttackResults.csv", dataRow);
+		od;
+	od;
+od;
+
+CloseStream(csvForResults);
+CloseStream(incorrectResults);

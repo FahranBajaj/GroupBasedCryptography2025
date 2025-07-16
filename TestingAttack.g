@@ -616,7 +616,7 @@ for r_length in R_LENGTHS do
 			callsToRecoveringL1 := 0;
 			callsToTestConjugacy := 0;
 			functionResults := [];
-			wrapperCall := IO_CallWithTimeout(rec(seconds := 1), AttackWrapper, G, gs, hs, g_length, r_length, contracting_depth, AutomPortrait(r));
+			wrapperCall := IO_CallWithTimeout(rec(hours := 1), AttackWrapper, G, gs, hs, g_length, r_length, contracting_depth, AutomPortrait(r));
 			dataRow := Concatenation(GROUP_STRING, ",", String(nucleusSize), ",", String(g_length), ",", String(r_length), ",", String(list_size), ",", String(contracting_depth), ",", String(contractingDepthTime));
 			if wrapperCall[1] then 
 				#didn't time out

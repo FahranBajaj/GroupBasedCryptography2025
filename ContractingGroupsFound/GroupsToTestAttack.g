@@ -1548,7 +1548,6 @@ AddDictionary(feasibilities, [G_20_3_07_3, 100], false);
 AddDictionary(feasibilities, [G_20_7_07_1, 100], false);
 depthBounds := NewDictionary([G_3_3_03_1, 10], true);
 depthTimes := NewDictionary([G_3_3_03_1, 10], true);
-
 AddDictionary(depthBounds, [G_3_3_03_1, 10], 10);
 AddDictionary(depthTimes, [G_3_3_03_1, 10], 18684);
 AddDictionary(depthBounds, [G_3_3_07_1, 10], 5);
@@ -1749,3 +1748,7 @@ AddDictionary(depthBounds, [G_3_10_03_1, 100], 28);
 AddDictionary(depthTimes, [G_3_10_03_1, 100], 15380171);
 AddDictionary(depthBounds, [G_3_3_03_2, 100], 21);
 AddDictionary(depthTimes, [G_3_3_03_2, 100], 16841030);
+AddDictionary(depthBounds, [G_3_3_03_3, 100], 22);
+AddDictionary(depthTimes, [G_3_3_03_3, 100], 22177303);
+AddDictionary(depthBounds, [G_3_10_03_2, 100], 33);
+AddDictionary(depthTimes, [G_3_10_03_2, 100], 34540828);

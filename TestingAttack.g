@@ -1,7 +1,6 @@
 LoadPackage("AutomGrp");
 CONJUGATION_ACTION := OnPoints; # action is conjugation
-callsToRecoveringL1 := 0;
-callsToTestConjugacy := 0;
+Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 
 NoRepeats := function(L)
 	local i, j, no_repeats;
@@ -21,14 +20,16 @@ end;
 
 ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracting_depth)
 
-	local N_LETTERS, nucleus, placeholder, AreNotConjugateOnLevel, nucleus_distinct_level,
+	local N_LETTERS, nucleus, placeholder, AreNotConjugateOnLevel, L, nucleus_distinct_level,
 		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
 		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
 		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
 		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation,
-		PruneSingleLevel, functionOutput;
+		PruneSingleLevel, functionOutpu, callsToRecoveringL1, callsToTestConjugacy;
 
 	N_LETTERS := DegreeOfTree(G);
+	callsToRecoveringL1 := 0;
+	callsToTestConjugacy := 0;
 
 	AreNotConjugateOnLevel:=function(a, b, max_level)
 		local perm_group, level;
@@ -366,8 +367,9 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 
 	#Recover portrait of secret conjugator
 	ConjugatorPortrait:=function(short_g_list, short_h_list)
-		local portrait, ConjugatorPortraitRecursive, gs_hs_to_multiply, 
-            new_g_list, new_h_list, i, idxs, gs, hs, runtime;
+		local portrait, ConjugatorPortraitRecursive, num_new_pairs, 
+			gs_hs_to_multiply, extended_word_length, new_g_list, 
+			new_h_list, i, idxs, gs, hs, runtime;
 
 		runtime := Runtime();
 		# Recursively builds portrait of conjugator from lists of conjugate pairs
@@ -413,9 +415,6 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 					new_h_list := [];
 					for g_h_index in [1..Size(g_list)] do 
 						g := g_list[g_h_index];
-						if IsOne(g) then
-							continue;
-						fi;
 						sigma_g := PermOnLevel(g, 1);
 						h := h_list[g_h_index];
 						#if (a_1, ..., a_n) is a cycle in sigma_g and b_i = sigma_r(a_i) then
@@ -431,9 +430,6 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
-					if Length(new_g_list) = 0 then	
-						return fail;
-					fi;
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 
@@ -529,7 +525,7 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 		new_h_list := [];	
 		num_new_pairs := 50;
 		if g_length <= r_length then 
-			extended_word_length := Int(Ceil(Float(conj_length/g_length))); 
+			extended_word_length := Int(Ceil(Float(r_length/g_length))); 
 		else
 			extended_word_length := 2;
 		fi;
@@ -549,13 +545,24 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 		Append(new_h_list, short_h_list);
 
 		portrait := ConjugatorPortraitRecursive(new_g_list, new_h_list, 1);
-		if portrait = fail then 
-			return fail;
-		fi;
 		runtime := Runtime() - runtime;
-		return [portrait, runtime];
+		return [portrait, runtime, callsToRecoveringL1, callsToTestConjugacy];
 	end; # End of ConjugatorPortrait
 	return ConjugatorPortrait(g_list, h_list);
+end;
+
+AttackWrapper := function(G, g_list, h_list, g_length, r_length, contracting_depth, real_portrait)
+	local portraitRecovered;
+
+	portraitRecovered := ConjugatorPortrait(G, g_list, h_list, g_length, r_length, contracting_depth);
+	Print("Returned in time!\n");
+	if portraitRecovered[1] = fail then 
+		return portraitRecovered;
+	elif portraitRecovered[1] = real_portrait then 	
+		return Concatenation([true], portraitRecovered{[2..4]});
+	else 
+		return Concatenation([false], portraitRecovered{[2..4]});
+	fi;
 end;
 
 RandomElementList := function(len, group, list_size)
@@ -578,12 +585,13 @@ RandomElement := function(len, group)
     return RandomElementList(len, group, 1)[1];
 end;
 
+
 Read("./ContractingGroupsFound/GroupsToTestAttack.g");
 csvForResults := OutputTextFile("AttackResults.csv", true);
 incorrectResults := OutputTextFile("IncorrectResults.g", true);
 
-GROUP_REC := ; 
-GROUP_STRING := ;
+GROUP_REC := G_3_3_03_1; 
+GROUP_STRING := "G_3_3_03_1";
 G_LENGTHS := [10, 100];
 R_LENGTHS := [10, 100];
 LIST_SIZES := [10];
@@ -607,24 +615,28 @@ for r_length in R_LENGTHS do
 			hs := List(gs, g -> g^r);
 			callsToRecoveringL1 := 0;
 			callsToTestConjugacy := 0;
-			functionResult := IO_CallWithTimeout(rec(hours := 1), ConjugatorPortrait, G, gs, hs, g_length, r_length, contracting_depth);
+			functionResults := [];
+			wrapperCall := IO_CallWithTimeout(rec(seconds := 1), AttackWrapper, G, gs, hs, g_length, r_length, contracting_depth, AutomPortrait(r));
 			dataRow := Concatenation(GROUP_STRING, ",", String(nucleusSize), ",", String(g_length), ",", String(r_length), ",", String(list_size), ",", String(contracting_depth), ",", String(contractingDepthTime));
-			if functionResult[1] then 
+			if wrapperCall[1] then 
 				#didn't time out
-				if functionResult[2][1] = fail then 
+				callsToRecoveringL1 := wrapperCall[2][3];
+				callsToTestConjugacy := wrapperCall[2][4];
+				if wrapperCall[2][1] = fail then 
 					#failed
-					dataRow := Concatenation(dataRow, ",0,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(functionResult[2][2]), "\n");
-				elif functionResult[2][1] = AutomPortrait(r) then 
+					dataRow := Concatenation(dataRow, ",0,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(wrapperCall[2][2]), "\n");
+				elif wrapperCall[2][1] then 
 					#function output was correct
-					dataRow := Concatenation(dataRow, ",1,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(functionResult[2][2]), "\n");
+					dataRow := Concatenation(dataRow, ",1,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(wrapperCall[2][2]), "\n");
 				else 
 					#function returned an incorrect portrait
 					AppendTo("IncorrectResults.g", "rec(G := ", G, ", gs := ", gs, ", hs := ", hs, ", g_length := ", g_length, ", r_length := ", r_length, ", contracting_depth := ", contracting_depth, "), ");
-					dataRow := Concatenation(dataRow, ",-2,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(functionResult[2][2]), "\n");
+					dataRow := Concatenation(dataRow, ",-2,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(functionResults[2]), "\n");
 				fi;
 			else 
 				#we timed out
-				dataRow := Concatenation(dataRow, ",-1,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), "\n");
+				Print("Timed out!\n");
+				dataRow := Concatenation(dataRow, ",-1\n");
 			fi;
 			AppendTo("AttackResults.csv", dataRow);
 		od;

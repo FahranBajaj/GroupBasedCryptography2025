@@ -547,9 +547,6 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 					new_h_list := [];
 					for g_h_index in [1..Size(g_list)] do 
 						g := g_list[g_h_index];
-						if IsOne(g) then
-							continue;
-						fi;
 						sigma_g := PermOnLevel(g, 1);
 						h := h_list[g_h_index];
 						#if (a_1, ..., a_n) is a cycle in sigma_g and b_i = sigma_r(a_i) then
@@ -565,9 +562,6 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
-					if Length(new_g_list) = 0 then	
-						return fail;
-					fi;
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 

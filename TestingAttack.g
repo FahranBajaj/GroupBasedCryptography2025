@@ -618,7 +618,11 @@ for r_length in R_LENGTHS do
 			functionResults := [];
 			wrapperCall := IO_CallWithTimeout(rec(hours := 1), AttackWrapper, G, gs, hs, g_length, r_length, contracting_depth, AutomPortrait(r));
 			dataRow := Concatenation(GROUP_STRING, ",", String(nucleusSize), ",", String(g_length), ",", String(r_length), ",", String(list_size), ",", String(contracting_depth), ",", String(contractingDepthTime));
-			if wrapperCall[1] then 
+			if wrapperCall[1] = fail then 
+				#unexpected error (probbaly used too much memory?)
+				Print("Unexpected error!\n");
+				dataRow := Concatenation(dataRow, ",-3\n");
+			elif wrapperCall[1] then 
 				#didn't time out
 				callsToRecoveringL1 := wrapperCall[2][3];
 				callsToTestConjugacy := wrapperCall[2][4];

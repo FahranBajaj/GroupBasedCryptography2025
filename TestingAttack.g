@@ -365,17 +365,43 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 	end;
 
 	ElemsWithDistinctPerms := function(gs, hs)
-		local perms_seen, elems_to_return, i, perm;
-		perms_seen := NewDictionary(PermOnLevel(gs[1], 1), false, SymmetricGroup(N_LETTERS));
-		elems_to_return := [];
-		for i in [1..Length(gs)] do	
+		local Argmin, permToElems, perms, i, perm, pairs_to_return, elemsWithPerm, argmin;
+		Argmin := function(list, func)
+			local argmin, min, i, newVal;
+			argmin := 1;
+			min := func(list[1]);
+			i := 2;
+			while i <= Length(list) do 
+				newVal := func(list[i]);
+				if newVal < min then 
+					min := newVal;
+					argmin := i;
+				fi;
+				i := i + 1;
+			od;
+			return argmin;
+		end;
+
+		permToElems := NewDictionary(PermOnLevel(gs[1], 1), true, SymmetricGroup(N_LETTERS));
+		perms := [];
+		for i in [1..Length(gs)] do 
 			perm := PermOnLevel(gs[i], 1);
-			if not KnowsDictionary(perms_seen, perm) then 
-				AddDictionary(perms_seen, perm);
-				Append(elems_to_return, [[gs[i], hs[i]]]);
+			if KnowsDictionary(permToElems, perm) then 
+				Append(LookupDictionary(permToElems, perm), [[gs[i], hs[i]]]);
+			else
+				AddDictionary(permToElems, perm, [[gs[i], hs[i]]]);
+				Append(perms, [perm]);
 			fi;
 		od;
-		return elems_to_return;
+
+		pairs_to_return := [];
+		for perm in perms do 
+			elemsWithPerm := LookupDictionary(permToElems, perm);
+			argmin := Argmin(elemsWithPerm, x -> Length(Word(x[1])));
+			Append(pairs_to_return, [elemsWithPerm[argmin]]);
+		od;
+		SortBy(pairs_to_return, x -> Length(Word(x[1])));
+		return pairs_to_return;
 	end;
 	
 	ElemWithPermutation := function(g_s, h_s, sigma)
@@ -413,7 +439,7 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
-				Print("Failed to recover an action on level ", level, "\n");
+				#Print("Failed to recover an action on level ", level, "\n");
 				return fail;
 			fi;
 
@@ -423,7 +449,7 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 				if nucleus_distinct_level = 1 then 
 					portrait_of_r := AssignNucleusElements(portrait_of_r, 1);
 				fi;
-				Print("Base case. Returning from level ", level, "\n");
+				#Print("Base case. Returning from level ", level, "\n");
 				return portrait_of_r;
 			fi;
 
@@ -436,9 +462,6 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 
 			#Recover as many sections as needed and fill in the rest
 			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list, h_list);
-			SortBy(elems_with_distinct_perms, g_h_pair -> Length(Word(g_h_pair[1])));
-			#Print(elems_with_distinct_perms);
-			#SortParallel(g_list, h_list, g -> Length(Word(g)));
 			sections_of_r := [];
 			for set_of_related_r_sections in related_r_sections do 
 				for section_index in [1..Length(set_of_related_r_sections)] do 
@@ -468,12 +491,16 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
-					Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
+					if Length(new_g_list) = 0 then 
+						#Print("Next list is empty at level ", level, "\n");
+						return fail;
+					fi;
+					#Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 
 							#could not recover any section in this set
-							Print("Could not recover any actions below level ", level, "\n");
+							#Print("Could not recover any actions below level ", level, "\n");
 							return fail;
 						else 
 							#try another section in this set
@@ -557,7 +584,7 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 			elif level < contracting_depth + 1 then 
 				portrait_of_r := PruneSingleLevel(portrait_of_r);
 			fi;
-			Print("Returning successfully from level ", level, "\n");
+			#Print("Returning successfully from level ", level, "\n");
 			return portrait_of_r;
 
 		end; #End of ConjugatorPortraitRecursive
@@ -598,10 +625,13 @@ AttackWrapper := function(G, g_list, h_list, g_length, r_length, contracting_dep
 	portraitRecovered := ConjugatorPortrait(G, g_list, h_list, g_length, r_length, contracting_depth);
 	Print("Returned in time!\n");
 	if portraitRecovered[1] = fail then 
+		Print("Returning ", portraitRecovered, "\n");
 		return portraitRecovered;
 	elif portraitRecovered[1] = real_portrait then 	
+		Print("Returning ", Concatenation([true], portraitRecovered{[2..4]}), "\n");
 		return Concatenation([true], portraitRecovered{[2..4]});
 	else 
+		Print("Returning ", Concatenation([false], portraitRecovered{[2..4]}), "\n");
 		return Concatenation([false], portraitRecovered{[2..4]});
 	fi;
 end;

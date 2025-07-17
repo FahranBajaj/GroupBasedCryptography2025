@@ -495,17 +495,43 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	end;
 
 	ElemsWithDistinctPerms := function(gs, hs)
-		local perms_seen, elems_to_return, i, perm;
-		perms_seen := NewDictionary(PermOnLevel(gs[1], 1), false, SymmetricGroup(N_LETTERS));
-		elems_to_return := [];
-		for i in [1..Length(gs)] do	
+		local Argmin, permToElems, perms, i, perm, pairs_to_return, elemsWithPerm, argmin;
+		Argmin := function(list, func)
+			local argmin, min, i, newVal;
+			argmin := 1;
+			min := func(list[1]);
+			i := 2;
+			while i <= Length(list) do 
+				newVal := func(list[i]);
+				if newVal < min then 
+					min := newVal;
+					argmin := i;
+				fi;
+				i := i + 1;
+			od;
+			return argmin;
+		end;
+
+		permToElems := NewDictionary(PermOnLevel(gs[1], 1), true, SymmetricGroup(N_LETTERS));
+		perms := [];
+		for i in [1..Length(gs)] do 
 			perm := PermOnLevel(gs[i], 1);
-			if not KnowsDictionary(perms_seen, perm) then 
-				AddDictionary(perms_seen, perm);
-				Append(elems_to_return, [[gs[i], hs[i]]]);
+			if KnowsDictionary(permToElems, perm) then 
+				Append(LookupDictionary(permToElems, perm), [[gs[i], hs[i]]]);
+			else
+				AddDictionary(permToElems, perm, [[gs[i], hs[i]]]);
+				Append(perms, [perm]);
 			fi;
 		od;
-		return elems_to_return;
+
+		pairs_to_return := [];
+		for perm in perms do 
+			elemsWithPerm := LookupDictionary(permToElems, perm);
+			argmin := Argmin(elemsWithPerm, x -> Length(Word(x[1])));
+			Append(pairs_to_return, [elemsWithPerm[argmin]]);
+		od;
+		SortBy(pairs_to_return, x -> Length(Word(x[1])));
+		return pairs_to_return;
 	end;
 	
 	ElemWithPermutation := function(g_s, h_s, sigma)
@@ -529,8 +555,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		local portrait, ConjugatorPortraitRecursive, contracting_depth,
 			gs_hs_to_multiply, new_g_list, new_h_list, i, idxs, gs, hs;
 
-		#contracting_depth := PortraitDepthUpperBound(key_length);
-		contracting_depth := 14;
+		contracting_depth := PortraitDepthUpperBound(key_length);
 		Print("Contracting depth is: ", contracting_depth, "\n");
 		Print("Nucleus distinct level is: ", nucleus_distinct_level, "\n");
 
@@ -567,7 +592,6 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 			#Recover as many sections as needed and fill in the rest
 			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list, h_list);
-			SortBy(elems_with_distinct_perms, g_h_pair -> Length(Word(g_h_pair[1])));
 			sections_of_r := [];
 			for set_of_related_r_sections in related_r_sections do 
 				for section_index in [1..Length(set_of_related_r_sections)] do 
@@ -598,6 +622,9 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
+					if Length(new_g_list) = 0 then 
+						return fail;
+					fi;
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 

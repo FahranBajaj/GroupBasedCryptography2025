@@ -21,11 +21,12 @@ end;
 ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracting_depth)
 
 	local N_LETTERS, nucleus, placeholder, AreNotConjugateOnLevel, L, nucleus_distinct_level,
-		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
-		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
-		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
-		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation,
-		PruneSingleLevel, functionOutpu, callsToRecoveringL1, callsToTestConjugacy;
+		N_perms, nucleus_one_down, PrunePortrait, ConjugatorPortrait, 
+		TestConjugacyRelationships, recoveringL1, IntersectionOfConjugators, 
+		PermutationOfNestedPortrait, PortraitProduct, PortraitInverse, FindAllConjugators, 
+		AssignNucleusElements, PortraitToNucleusByPermutation, ElemsWithDistinctPerms, 
+		ElemWithPermutation, PruneSingleLevel, functionOutpu, callsToRecoveringL1, 
+		callsToTestConjugacy;
 
 	N_LETTERS := DegreeOfTree(G);
 	callsToRecoveringL1 := 0;
@@ -199,6 +200,29 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 		fi;
 	od;
 
+	PermutationOfNestedPortrait := function(portrait, depth_of_portrait)
+		local i, perms, l;
+
+		if Length(portrait)=1 then 
+			return PermOnLevel(portrait[1], depth_of_portrait); 
+		fi;
+
+		if depth_of_portrait=1 then
+			return portrait[1];
+		fi;
+
+		perms:=List([1..N_LETTERS],x->PermutationOfNestedPortrait (portrait[x+1], depth_of_portrait-1));
+
+		l := [];
+
+		for i in [1..N_LETTERS] 
+			do
+				Append(l, List(ListPerm(perms[i],N_LETTERS^(depth_of_portrait-1)),x->x+N_LETTERS^(depth_of_portrait-1)*(i^portrait[1]-1)));
+			od;
+
+		return PermList(l);
+	end;
+
 	N_perms := List(nucleus, x -> PermOnLevel(x, nucleus_distinct_level));
 
 	PortraitToNucleusByPermutation := function( port )
@@ -211,8 +235,8 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 				return nucleus[i];
 			fi;
 		od;
-		#Error("Did not reach element of the nucleus at contracting_depth");	
-		return nucleus[1];
+		Error("Did not reach element of the nucleus at contracting_depth");	
+		#return nucleus[1];
 	end;
 
 	#given portrait with a bunch of placeholders, replace with nucleus elements
@@ -229,25 +253,40 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 	end;
 
 	#Modified from Arsalan
+	nucleus_one_down := List(nucleus , x -> [[x],Concatenation([PermOnLevel(x,1)] , List([1..N_LETTERS],y->[PortraitToNucleusByPermutation([Sections(x)[y]])])) ]) ;
 	PrunePortrait := function(portrait)
-		local nucleus, nucleus_identified, prune;
+		local IdentifyNucleusElement, prune, identified_nuc_elem;
 
-		nucleus := List(GroupNucleus(G), x-> [x]) ; 
-		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
+		IdentifyNucleusElement := function(p_int)
+			#Assumption: p_int is a portrait of depth greater than 0
+			local nucleus_elem, i;
+			for nucleus_elem in nucleus_one_down do 
+				if p_int[1] = nucleus_elem[2][1] then 
+					#permutations match
+					i := 2;
+					while i <= N_LETTERS + 1 and Length(p_int[i]) = 1 and Word(p_int[i][1]) = Word(nucleus_elem[2][i][1]) do 
+						i := i + 1;
+					od;
+					if i = N_LETTERS + 2 then 	
+						return nucleus_elem[1];
+					fi;
+				fi;
+			od;
+			return fail;
+		end;
 
 		prune := function(p) 
 			local p_int , i ; 
 			p_int := [] ;
-			if p in nucleus then 
-				return p ;
+			if Length(p) = 1 then 
+				return p;
 			else 
-				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1]))) ;
-				for i in [1..Length(nucleus_identified)] do 
-						if p_int = nucleus_identified[i][2] then
-							return nucleus_identified[i][1];
-						fi;
-					od;
-				return p_int ;
+				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1])));
+				identified_nuc_elem := IdentifyNucleusElement(p_int);
+				if identified_nuc_elem <> fail then 
+					return identified_nuc_elem;
+				fi;
+				return p_int;
 			fi;
 		end;
 
@@ -255,24 +294,38 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 	end;
 
 	PruneSingleLevel := function(portrait)
-		local nucleus, nucleus_identified, prune;
+		local IdentifyNucleusElement, prune, identified_nuc_elem;
 
-		nucleus := List(GroupNucleus(G), x-> [x]) ; 
-		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
+		IdentifyNucleusElement := function(p_int)
+			#Assumption: p_int is a portrait of depth greater than 0
+			local nucleus_elem, i;
+			for nucleus_elem in nucleus_one_down do 
+				if p_int[1] = nucleus_elem[2][1] then 
+					#permutations match
+					i := 2;
+					while i <= N_LETTERS + 1 and Length(p_int[i]) = 1 and Word(p_int[i][1]) = Word(nucleus_elem[2][i][1]) do 
+						i := i + 1;
+					od;
+					if i = N_LETTERS + 2 then 	
+						return nucleus_elem[1];
+					fi;
+				fi;
+			od;
+			return fail;
+		end;
 
 		prune := function(p) 
 			local p_int , i ; 
 			p_int := [] ;
-			if p in nucleus then 
-				return p ;
+			if Length(p) = 1 then 
+				return p;
 			else 
-				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> p[x+1])) ;
-				for i in [1..Length(nucleus_identified)] do 
-						if p_int = nucleus_identified[i][2] then
-							return nucleus_identified[i][1];
-						fi;
-					od;
-				return p_int ;
+				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> p[x+1]));
+				identified_nuc_elem := IdentifyNucleusElement(p_int);
+				if identified_nuc_elem <> fail then 
+					return identified_nuc_elem;
+				fi;
+				return p_int;
 			fi;
 		end;
 
@@ -312,41 +365,18 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 		return inverse(p) ;
 	end;
 
-	PermutationOfNestedPortrait := function(portrait, depth_of_portrait)
-		local i, perms, l;
-
-		if Length(portrait)=1 then 
-			return PermOnLevel(portrait[1], depth_of_portrait); 
-		fi;
-
-		if depth_of_portrait=1 then
-			return portrait[1];
-		fi;
-
-		perms:=List([1..N_LETTERS],x->PermutationOfNestedPortrait (portrait[x+1], depth_of_portrait-1));
-
-		l := [];
-
-		for i in [1..N_LETTERS] 
-			do
-				Append(l, List(ListPerm(perms[i],N_LETTERS^(depth_of_portrait-1)),x->x+N_LETTERS^(depth_of_portrait-1)*(i^portrait[1]-1)));
-			od;
-
-		return PermList(l);
-	end;
-
-	ElemsWithDistinctPerms := function(elems)
-		local perms_seen, indices_to_return, i, perm;
-		perms_seen := NewDictionary(PermOnLevel(elems[1], 1), false, SymmetricGroup(N_LETTERS));
-		indices_to_return := [];
-		for i in [1..Length(elems)] do	
-			perm := PermOnLevel(elems[i], 1);
+	ElemsWithDistinctPerms := function(gs, hs)
+		local perms_seen, elems_to_return, i, perm;
+		perms_seen := NewDictionary(PermOnLevel(gs[1], 1), false, SymmetricGroup(N_LETTERS));
+		elems_to_return := [];
+		for i in [1..Length(gs)] do	
+			perm := PermOnLevel(gs[i], 1);
 			if not KnowsDictionary(perms_seen, perm) then 
 				AddDictionary(perms_seen, perm);
-				Append(indices_to_return, [i]);
+				Append(elems_to_return, [[gs[i], hs[i]]]);
 			fi;
 		od;
-		return indices_to_return;
+		return elems_to_return;
 	end;
 	
 	ElemWithPermutation := function(g_s, h_s, sigma)
@@ -377,13 +407,14 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 		
 			local sigma_r, sigma_gs, related_r_sections, elems_with_distinct_perms, set_of_related_r_sections, 
 				i, new_g_list, new_h_list, g_h_index, sigma_g, sections_of_r, 
-				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
+				lhs, g, h, next, rhs, g_h_pair, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
 				current_portrait_depth, j, section_index, portrait_of_r;
 
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
+				Print("Failed to recover an action on level ", level, "\n");
 				return fail;
 			fi;
 
@@ -393,6 +424,7 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 				if nucleus_distinct_level = 1 then 
 					portrait_of_r := AssignNucleusElements(portrait_of_r, 1);
 				fi;
+				Print("Base case. Returning from level ", level, "\n");
 				return portrait_of_r;
 			fi;
 
@@ -404,7 +436,10 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 			SortBy(related_r_sections, orbit -> Length(orbit)); #arrange from smallest to largest
 
 			#Recover as many sections as needed and fill in the rest
-			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list);
+			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list, h_list);
+			SortBy(elems_with_distinct_perms, g_h_pair -> Length(Word(g_h_pair[1])));
+			#Print(elems_with_distinct_perms);
+			#SortParallel(g_list, h_list, g -> Length(Word(g)));
 			sections_of_r := [];
 			for set_of_related_r_sections in related_r_sections do 
 				for section_index in [1..Length(set_of_related_r_sections)] do 
@@ -427,13 +462,19 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 							rhs := rhs*Section(h, next^sigma_r);
 							next := next^sigma_g;
 						od;
+						#easy way to avoid adding identities to list
+						if Length(Word(lhs)) = 0 then 
+							continue;
+						fi;
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
+					Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
 						if section_index = Length(set_of_related_r_sections) then 
 							#could not recover any section in this set
+							Print("Could not recover any actions below level ", level, "\n");
 							return fail;
 						else 
 							#try another section in this set
@@ -449,10 +490,10 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 					number_recovered := 1;
 					while number_recovered < Length(set_of_related_r_sections) do
 						for index in new_r_sections do 
-							for g_h_index in elems_with_distinct_perms do 
-								g := g_list[g_h_index];
+							for g_h_pair in elems_with_distinct_perms do 
+								g := g_h_pair[1];
 								sigma_g := PermOnLevel(g, 1);
-								h := h_list[g_h_index];
+								h := g_h_pair[2];
 								sigma_h := PermOnLevel(h, 1);
 								cycle_member := index^sigma_g;
 								h_index := index^sigma_r;
@@ -517,6 +558,7 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 			elif level < contracting_depth + 1 then 
 				portrait_of_r := PruneSingleLevel(portrait_of_r);
 			fi;
+			Print("Returning successfully from level ", level, "\n");
 			return portrait_of_r;
 
 		end; #End of ConjugatorPortraitRecursive
@@ -590,8 +632,8 @@ Read("./ContractingGroupsFound/GroupsToTestAttack.g");
 csvForResults := OutputTextFile("AttackResults.csv", true);
 incorrectResults := OutputTextFile("IncorrectResults.g", true);
 
-GROUP_REC := G_3_3_03_1; 
-GROUP_STRING := "G_3_3_03_1";
+GROUP_REC := G_12_3_07_2; 
+GROUP_STRING := "G_12_3_07_2";
 G_LENGTHS := [10, 100];
 R_LENGTHS := [10, 100];
 LIST_SIZES := [10];
@@ -634,8 +676,8 @@ for r_length in R_LENGTHS do
 					dataRow := Concatenation(dataRow, ",1,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(wrapperCall[2][2]), "\n");
 				else 
 					#function returned an incorrect portrait
-					AppendTo("IncorrectResults.g", "rec(G := ", G, ", gs := ", gs, ", hs := ", hs, ", g_length := ", g_length, ", r_length := ", r_length, ", contracting_depth := ", contracting_depth, "), ");
-					dataRow := Concatenation(dataRow, ",-2,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(functionResults[2]), "\n");
+					AppendTo("IncorrectResults.g", "rec(G := ", G, ", gs := ", gs, ", hs := ", hs, ", g_length := ", g_length, ", r_length := ", r_length, ", r := ", r, ", contracting_depth := ", contracting_depth, "), ");
+					dataRow := Concatenation(dataRow, ",-2,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(wrapperCall[2][2]), "\n");
 				fi;
 			else 
 				#we timed out

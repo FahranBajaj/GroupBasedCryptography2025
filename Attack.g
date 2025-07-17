@@ -100,13 +100,14 @@ end;
 ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_approx, epsilon,
 								extended_word_length, num_new_pairs)
 
-	local N_LETTERS, nucleus, MaxContractingDepth, M, ContractingDepthStatApprox, L,
-		placeholder, PortraitDepthUpperBound, AreNotConjugateOnLevel, nucleus_distinct_level,
-		N_perms, PrunePortrait, ConjugatorPortrait, TestConjugacyRelationships, 
-		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
-		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
-		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation,
-		PruneSingleLevel;
+	local N_LETTERS, nucleus, placeholder, AreNotConjugateOnLevel, L, nucleus_distinct_level,
+		N_perms, nucleus_one_down, PrunePortrait, ConjugatorPortrait, 
+		TestConjugacyRelationships, recoveringL1, IntersectionOfConjugators, 
+		PermutationOfNestedPortrait, PortraitProduct, PortraitInverse, FindAllConjugators, 
+		AssignNucleusElements, PortraitToNucleusByPermutation, ElemsWithDistinctPerms, 
+		ElemWithPermutation, PruneSingleLevel, functionOutpu, callsToRecoveringL1, 
+		callsToTestConjugacy, MaxContractingDepth, ContractingDepthStatApprox, 
+		PortraitDepthUpperBound;
 
 	N_LETTERS := DegreeOfTree(G);
 
@@ -321,7 +322,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	nucleus := GroupNucleus(G);
 	placeholder := nucleus[1];
 	nucleus_distinct_level := 1;
-	while true do	
+	while true do
 		L := List(nucleus, x -> PermOnLevel(x, nucleus_distinct_level));
 		if NoRepeats(L) then
 			break;
@@ -329,6 +330,29 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			nucleus_distinct_level := nucleus_distinct_level + 1;
 		fi;
 	od;
+
+	PermutationOfNestedPortrait := function(portrait, depth_of_portrait)
+		local i, perms, l;
+
+		if Length(portrait)=1 then 
+			return PermOnLevel(portrait[1], depth_of_portrait); 
+		fi;
+
+		if depth_of_portrait=1 then
+			return portrait[1];
+		fi;
+
+		perms:=List([1..N_LETTERS],x->PermutationOfNestedPortrait (portrait[x+1], depth_of_portrait-1));
+
+		l := [];
+
+		for i in [1..N_LETTERS] 
+			do
+				Append(l, List(ListPerm(perms[i],N_LETTERS^(depth_of_portrait-1)),x->x+N_LETTERS^(depth_of_portrait-1)*(i^portrait[1]-1)));
+			od;
+
+		return PermList(l);
+	end;
 
 	N_perms := List(nucleus, x -> PermOnLevel(x, nucleus_distinct_level));
 
@@ -359,25 +383,40 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	end;
 
 	#Modified from Arsalan
+	nucleus_one_down := List(nucleus , x -> [[x],Concatenation([PermOnLevel(x,1)] , List([1..N_LETTERS],y->[PortraitToNucleusByPermutation([Sections(x)[y]])])) ]) ;
 	PrunePortrait := function(portrait)
-		local nucleus, nucleus_identified, prune;
+		local IdentifyNucleusElement, prune, identified_nuc_elem;
 
-		nucleus := List(GroupNucleus(G), x-> [x]) ; 
-		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
+		IdentifyNucleusElement := function(p_int)
+			#Assumption: p_int is a portrait of depth greater than 0
+			local nucleus_elem, i;
+			for nucleus_elem in nucleus_one_down do 
+				if p_int[1] = nucleus_elem[2][1] then 
+					#permutations match
+					i := 2;
+					while i <= N_LETTERS + 1 and Length(p_int[i]) = 1 and Word(p_int[i][1]) = Word(nucleus_elem[2][i][1]) do 
+						i := i + 1;
+					od;
+					if i = N_LETTERS + 2 then 	
+						return nucleus_elem[1];
+					fi;
+				fi;
+			od;
+			return fail;
+		end;
 
 		prune := function(p) 
 			local p_int , i ; 
 			p_int := [] ;
-			if p in nucleus then 
-				return p ;
+			if Length(p) = 1 then 
+				return p;
 			else 
-				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1]))) ;
-				for i in [1..Length(nucleus_identified)] do 
-						if p_int = nucleus_identified[i][2] then
-							return nucleus_identified[i][1];
-						fi;
-					od;
-				return p_int ;
+				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1])));
+				identified_nuc_elem := IdentifyNucleusElement(p_int);
+				if identified_nuc_elem <> fail then 
+					return identified_nuc_elem;
+				fi;
+				return p_int;
 			fi;
 		end;
 
@@ -385,24 +424,38 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	end;
 
 	PruneSingleLevel := function(portrait)
-		local nucleus, nucleus_identified, prune;
+		local IdentifyNucleusElement, prune, identified_nuc_elem;
 
-		nucleus := List(GroupNucleus(G), x-> [x]) ; 
-		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
+		IdentifyNucleusElement := function(p_int)
+			#Assumption: p_int is a portrait of depth greater than 0
+			local nucleus_elem, i;
+			for nucleus_elem in nucleus_one_down do 
+				if p_int[1] = nucleus_elem[2][1] then 
+					#permutations match
+					i := 2;
+					while i <= N_LETTERS + 1 and Length(p_int[i]) = 1 and Word(p_int[i][1]) = Word(nucleus_elem[2][i][1]) do 
+						i := i + 1;
+					od;
+					if i = N_LETTERS + 2 then 	
+						return nucleus_elem[1];
+					fi;
+				fi;
+			od;
+			return fail;
+		end;
 
 		prune := function(p) 
 			local p_int , i ; 
 			p_int := [] ;
-			if p in nucleus then 
-				return p ;
+			if Length(p) = 1 then 
+				return p;
 			else 
-				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> p[x+1])) ;
-				for i in [1..Length(nucleus_identified)] do 
-						if p_int = nucleus_identified[i][2] then
-							return nucleus_identified[i][1];
-						fi;
-					od;
-				return p_int ;
+				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> p[x+1]));
+				identified_nuc_elem := IdentifyNucleusElement(p_int);
+				if identified_nuc_elem <> fail then 
+					return identified_nuc_elem;
+				fi;
+				return p_int;
 			fi;
 		end;
 
@@ -442,41 +495,18 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		return inverse(p) ;
 	end;
 
-	PermutationOfNestedPortrait := function(portrait, depth_of_portrait)
-		local i, perms, l;
-
-		if Length(portrait)=1 then 
-			return PermOnLevel(portrait[1], depth_of_portrait); 
-		fi;
-
-		if depth_of_portrait=1 then
-			return portrait[1];
-		fi;
-
-		perms:=List([1..N_LETTERS],x->PermutationOfNestedPortrait (portrait[x+1], depth_of_portrait-1));
-
-		l := [];
-
-		for i in [1..N_LETTERS] 
-			do
-				Append(l, List(ListPerm(perms[i],N_LETTERS^(depth_of_portrait-1)),x->x+N_LETTERS^(depth_of_portrait-1)*(i^portrait[1]-1)));
-			od;
-
-		return PermList(l);
-	end;
-
-	ElemsWithDistinctPerms := function(elems)
-		local perms_seen, indices_to_return, i, perm;
-		perms_seen := NewDictionary(PermOnLevel(elems[1], 1), false, SymmetricGroup(N_LETTERS));
-		indices_to_return := [];
-		for i in [1..Length(elems)] do	
-			perm := PermOnLevel(elems[i], 1);
+	ElemsWithDistinctPerms := function(gs, hs)
+		local perms_seen, elems_to_return, i, perm;
+		perms_seen := NewDictionary(PermOnLevel(gs[1], 1), false, SymmetricGroup(N_LETTERS));
+		elems_to_return := [];
+		for i in [1..Length(gs)] do	
+			perm := PermOnLevel(gs[i], 1);
 			if not KnowsDictionary(perms_seen, perm) then 
 				AddDictionary(perms_seen, perm);
-				Append(indices_to_return, [i]);
+				Append(elems_to_return, [[gs[i], hs[i]]]);
 			fi;
 		od;
-		return indices_to_return;
+		return elems_to_return;
 	end;
 	
 	ElemWithPermutation := function(g_s, h_s, sigma)
@@ -500,7 +530,8 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		local portrait, ConjugatorPortraitRecursive, contracting_depth,
 			gs_hs_to_multiply, new_g_list, new_h_list, i, idxs, gs, hs;
 
-		contracting_depth := PortraitDepthUpperBound(key_length);
+		#contracting_depth := PortraitDepthUpperBound(key_length);
+		contracting_depth := 14;
 		Print("Contracting depth is: ", contracting_depth, "\n");
 		Print("Nucleus distinct level is: ", nucleus_distinct_level, "\n");
 
@@ -508,7 +539,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		ConjugatorPortraitRecursive :=function(g_list, h_list, level)
 		
 			local sigma_r, sigma_gs, related_r_sections, elems_with_distinct_perms, set_of_related_r_sections, 
-				i, new_g_list, new_h_list, g_h_index, sigma_g, sections_of_r, 
+				i, new_g_list, new_h_list, g_h_index, sigma_g, sections_of_r, g_h_pair, 
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
@@ -536,7 +567,8 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			SortBy(related_r_sections, orbit -> Length(orbit)); #arrange from smallest to largest
 
 			#Recover as many sections as needed and fill in the rest
-			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list);
+			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list, h_list);
+			SortBy(elems_with_distinct_perms, g_h_pair -> Length(Word(g_h_pair[1])));
 			sections_of_r := [];
 			for set_of_related_r_sections in related_r_sections do 
 				for section_index in [1..Length(set_of_related_r_sections)] do 
@@ -559,6 +591,11 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 							rhs := rhs*Section(h, next^sigma_r);
 							next := next^sigma_g;
 						od;
+
+						#easy way to avoid adding identities to list
+						if Length(Word(lhs)) = 0 then 
+							continue;
+						fi;
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
@@ -581,10 +618,10 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 					number_recovered := 1;
 					while number_recovered < Length(set_of_related_r_sections) do
 						for index in new_r_sections do 
-							for g_h_index in elems_with_distinct_perms do 
-								g := g_list[g_h_index];
+							for g_h_pair in elems_with_distinct_perms do 
+								g := g_h_pair[1];
 								sigma_g := PermOnLevel(g, 1);
-								h := h_list[g_h_index];
+								h := g_h_pair[2];
 								sigma_h := PermOnLevel(h, 1);
 								cycle_member := index^sigma_g;
 								h_index := index^sigma_r;
@@ -680,15 +717,169 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 end;
 
 #A simplified example
-G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)"); #Hanoi 3 Group
-AG_UseRewritingSystem(G);
-AG_UpdateRewritingSystem(G, 2);
-Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
-g_list := List([1..10], i -> Random(G));
-r := Product(List([1..10], i -> Random(G)));
-h_list := List(g_list, g -> r^-1*g*r);
-final := ConjugatorPortrait(G, g_list, h_list, 30, 2, false, 1, 3, 50); #r is probably not of length more than 20
-Print("r: ", r, "\n");
-Print("Portrait of r: ", AutomPortrait(r), "\n");
-Print("Portrait we found: ", final, "\n");
-Print("Correct? ", AutomPortrait(r) = final, "\n");
+# G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)"); #Hanoi 3 Group
+# AG_UseRewritingSystem(G);
+# AG_UpdateRewritingSystem(G, 2);
+# Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
+# g_list := List([1..10], i -> Random(G));
+# r := Product(List([1..10], i -> Random(G)));
+# h_list := List(g_list, g -> r^-1*g*r);
+# final := ConjugatorPortrait(G, g_list, h_list, 30, 2, false, 1, 3, 50); #r is probably not of length more than 20
+# Print("r: ", r, "\n");
+# Print("Portrait of r: ", AutomPortrait(r), "\n");
+# Print("Portrait we found: ", final, "\n");
+# Print("Correct? ", AutomPortrait(r) = final, "\n");
+
+G := AutomatonGroup("a1 = (1, 1, 1, a1, a5, 1, 1)(2,7,3)(4,6,5), a2 = (1,\
+ 1, a6, 1, a1, 1, a6)(1,5)(2,7,4,6,3), a3 = (1, a3, a5, a2, 1, 1, 1)(1,2,5,6,\
+4,3), a4 = (1, 1, a2, 1, 1, 1, 1)(1,2,5,6)(4,7), a5 = (a7, 1, 1, 1, 1, 1, a3)\
+(1,6,2,4,7,3,5), a6 = (1, a2, 1, 1, a4, 1, 1)(1,3)(2,7)(4,5,6), a7 = (1, 1, 1\
+, a6, 1, 1, a5)(1,3,4,6,2,7,5), a8 = (1, 1, 1, a12, 1, a8, 1)(2,3,7)(4,5,6), \
+a9 = (a8, a13, 1, a13, 1, 1, 1)(1,5)(2,3,6,4,7), a10 = (a12, 1, a9, 1, a10, 1\
+, 1)(1,3,4,6,5,2), a11 = (1, 1, a9, 1, 1, 1, 1)(1,6,5,2)(4,7), a12 = (1, 1, a\
+10, 1, 1, a14, 1)(1,5,3,7,4,2,6), a13 = (1, 1, 1, 1, 1, a11, a9)(1,3)(2,7)(4,\
+6,5), a14 = (1, 1, 1, 1, a12, a13, 1)(1,5,7,2,6,4,3)");
+gs := 
+[ a4*a2*a3*a1*a4*a9*a7*a5*a4*a5, a7*a11*a1*a7*a12*a7*a9*a12*a14*a1, 
+  a1*a5*a11*a7*a6*a1*a10*a1*a12*a8, a3*a14*a6*a11*a14*a7*a12*a1*a10*a8, 
+  a9*a1*a7*a2*a14*a10*a11*a7*a8*a14, a12*a9*a11*a3*a10*a1*a10*a14*a3*a14, 
+  a12*a6*a7*a12*a7*a4*a10*a11^2*a13, a14*a11*a10*a5*a3*a14*a5*a8*a2*a9, 
+  a2*a7*a9^2*a8*a14*a8*a5*a9*a11, a4*a8*a14*a3*a12*a3*a6*a2*a4*a12 ];
+   hs := 
+[ a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
+*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
+*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
+14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
+^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
+4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
+^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
+^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a4*a2*a3*a1*a\
+4*a9*a7*a5*a4*a5*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13*a10\
+*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10*a1*\
+a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*a7*a\
+4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a7*a2\
+*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
+  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
+*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
+*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
+14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
+^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
+4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
+^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
+^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a7*a11*a1*a7*\
+a12*a7*a9*a12*a14*a1*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13\
+*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10\
+*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*\
+a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a\
+7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
+  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
+*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
+*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
+14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
+^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
+4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
+^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
+^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a1*a5*a11*a7*\
+a6*a1*a10*a1*a12*a8*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13*\
+a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10*\
+a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*a\
+7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a7\
+*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
+  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
+*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
+*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
+14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
+^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
+4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
+^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
+^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a3*a14*a6*a11\
+*a14*a7*a12*a1*a10*a8*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a1\
+3*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a1\
+0*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4\
+*a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*\
+a7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
+  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
+*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
+*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
+14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
+^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
+4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
+^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
+^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a9*a1*a7*a2*a\
+14*a10*a11*a7*a8*a14*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13\
+*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10\
+*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*\
+a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a\
+7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
+  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
+*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
+*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
+14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
+^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
+4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
+^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
+^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a12*a9*a11*a3\
+*a10*a1*a10*a14*a3*a14*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a\
+13*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a\
+10*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a\
+4*a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6\
+*a7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
+  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
+*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
+*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
+14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
+^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
+4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
+^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
+^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a12*a6*a7*a12\
+*a7*a4*a10*a11^2*a13*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13\
+*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10\
+*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*\
+a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a\
+7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
+  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
+*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
+*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
+14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
+^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
+4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
+^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
+^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a14*a11*a10*a\
+5*a3*a14*a5*a8*a2*a9*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13\
+*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10\
+*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*\
+a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a\
+7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
+  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
+*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
+*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
+14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
+^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
+4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
+^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
+^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a7*a9^2*a8*a14*a8*a\
+5*a9*a11*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13*a10*a14^2*a\
+2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10*a1*a4*a10*a\
+14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*a7*a4*a13*a5\
+*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a7*a2*a9*a10*\
+a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
+  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
+*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
+*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
+14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
+^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
+4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
+^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
+^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a4*a8*a14*a3*\
+a12*a3*a6*a2*a4*a12*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13*\
+a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10*\
+a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*a\
+7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a7\
+*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8 ];
+r := a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13*a10*a14^2*a2*a9*a6*a\
+5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10*a1*a4*a10*a14*a3*a10\
+*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*a7*a4*a13*a5*a7*a8*a1\
+2*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a7*a2*a9*a10*a9*a6*a14\
+*a1*a10*a6*a11^2*a9*a8;
+portraitRecovered := ConjugatorPortrait(G, gs, hs, 100, 2, true, 0.01, 0, 0);
+Print(portraitRecovered = AutomPortrait(r));

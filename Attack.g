@@ -179,28 +179,27 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	end;
 
 	FindAllConjugators := function(G, g, h)
-		local centralizer, r;
-
-		centralizer := Centralizer(G, g); # centralizer of g
-		r := RepresentativeAction(G, g, h, CONJUGATION_ACTION);
-		return Elements(RightCoset(centralizer, r));
+			local centralizer, r, c;
+			centralizer := Centralizer(G, g); # centralizer of g
+			r := RepresentativeAction(G, g, h, CONJUGATION_ACTION);
+	        return RightCoset(centralizer,r);
 	end;
-
+	
 	IntersectionOfConjugators := function(g_t, h_t)
-		local sigma_g, sigma_h, ghConjugators, allConj, i;
-
-		# getting tuples of g and h values
-		ghConjugators := FindAllConjugators(PermGroupOnLevel(G, 1), PermOnLevel(g_t[1], 1), PermOnLevel(h_t[1], 1));
-		i := 2;
-		while Length(ghConjugators) > 1 and i <= Length(g_t) do
-			# all conjugators of a g/h pair
-			sigma_g := PermOnLevel(g_t[i], 1);
-			sigma_h := PermOnLevel(h_t[i], 1);
-			allConj := FindAllConjugators(PermGroupOnLevel(G, 1), sigma_g, sigma_h);
-			ghConjugators := Intersection(ghConjugators, allConj);
-			i := i + 1;
-		od;
-		return ghConjugators;
+	    local sigma_g, sigma_h, ghConjugators, allConj, i;
+	
+	    # getting tuples of g and h values
+	    ghConjugators := FindAllConjugators(PermGroupOnLevel(G, 1), PermOnLevel(g_t[1], 1), PermOnLevel(h_t[1], 1));
+	    i := 2;
+	    while Size(ghConjugators) > 1 and i <= Length(g_t) do
+	        # all conjugators of a g/h pair
+	        sigma_g := PermOnLevel(g_t[i], 1);
+	        sigma_h := PermOnLevel(h_t[i], 1);
+	        allConj := FindAllConjugators(PermGroupOnLevel(G, 1), sigma_g, sigma_h);
+	        ghConjugators := Intersection(ghConjugators, allConj);
+	        i := i + 1;
+	    od;
+	    return Elements(ghConjugators);
 	end;
 
 	#Helper method to recover action of r on the first level. Takes one (g, h) pair and 
@@ -717,169 +716,15 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 end;
 
 #A simplified example
-# G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)"); #Hanoi 3 Group
-# AG_UseRewritingSystem(G);
-# AG_UpdateRewritingSystem(G, 2);
-# Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
-# g_list := List([1..10], i -> Random(G));
-# r := Product(List([1..10], i -> Random(G)));
-# h_list := List(g_list, g -> r^-1*g*r);
-# final := ConjugatorPortrait(G, g_list, h_list, 30, 2, false, 1, 3, 50); #r is probably not of length more than 20
-# Print("r: ", r, "\n");
-# Print("Portrait of r: ", AutomPortrait(r), "\n");
-# Print("Portrait we found: ", final, "\n");
-# Print("Correct? ", AutomPortrait(r) = final, "\n");
-
-G := AutomatonGroup("a1 = (1, 1, 1, a1, a5, 1, 1)(2,7,3)(4,6,5), a2 = (1,\
- 1, a6, 1, a1, 1, a6)(1,5)(2,7,4,6,3), a3 = (1, a3, a5, a2, 1, 1, 1)(1,2,5,6,\
-4,3), a4 = (1, 1, a2, 1, 1, 1, 1)(1,2,5,6)(4,7), a5 = (a7, 1, 1, 1, 1, 1, a3)\
-(1,6,2,4,7,3,5), a6 = (1, a2, 1, 1, a4, 1, 1)(1,3)(2,7)(4,5,6), a7 = (1, 1, 1\
-, a6, 1, 1, a5)(1,3,4,6,2,7,5), a8 = (1, 1, 1, a12, 1, a8, 1)(2,3,7)(4,5,6), \
-a9 = (a8, a13, 1, a13, 1, 1, 1)(1,5)(2,3,6,4,7), a10 = (a12, 1, a9, 1, a10, 1\
-, 1)(1,3,4,6,5,2), a11 = (1, 1, a9, 1, 1, 1, 1)(1,6,5,2)(4,7), a12 = (1, 1, a\
-10, 1, 1, a14, 1)(1,5,3,7,4,2,6), a13 = (1, 1, 1, 1, 1, a11, a9)(1,3)(2,7)(4,\
-6,5), a14 = (1, 1, 1, 1, a12, a13, 1)(1,5,7,2,6,4,3)");
-gs := 
-[ a4*a2*a3*a1*a4*a9*a7*a5*a4*a5, a7*a11*a1*a7*a12*a7*a9*a12*a14*a1, 
-  a1*a5*a11*a7*a6*a1*a10*a1*a12*a8, a3*a14*a6*a11*a14*a7*a12*a1*a10*a8, 
-  a9*a1*a7*a2*a14*a10*a11*a7*a8*a14, a12*a9*a11*a3*a10*a1*a10*a14*a3*a14, 
-  a12*a6*a7*a12*a7*a4*a10*a11^2*a13, a14*a11*a10*a5*a3*a14*a5*a8*a2*a9, 
-  a2*a7*a9^2*a8*a14*a8*a5*a9*a11, a4*a8*a14*a3*a12*a3*a6*a2*a4*a12 ];
-   hs := 
-[ a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
-*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
-*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
-14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
-^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
-4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
-^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
-^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a4*a2*a3*a1*a\
-4*a9*a7*a5*a4*a5*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13*a10\
-*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10*a1*\
-a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*a7*a\
-4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a7*a2\
-*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
-  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
-*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
-*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
-14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
-^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
-4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
-^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
-^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a7*a11*a1*a7*\
-a12*a7*a9*a12*a14*a1*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13\
-*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10\
-*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*\
-a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a\
-7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
-  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
-*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
-*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
-14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
-^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
-4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
-^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
-^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a1*a5*a11*a7*\
-a6*a1*a10*a1*a12*a8*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13*\
-a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10*\
-a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*a\
-7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a7\
-*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
-  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
-*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
-*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
-14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
-^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
-4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
-^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
-^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a3*a14*a6*a11\
-*a14*a7*a12*a1*a10*a8*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a1\
-3*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a1\
-0*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4\
-*a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*\
-a7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
-  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
-*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
-*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
-14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
-^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
-4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
-^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
-^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a9*a1*a7*a2*a\
-14*a10*a11*a7*a8*a14*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13\
-*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10\
-*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*\
-a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a\
-7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
-  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
-*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
-*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
-14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
-^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
-4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
-^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
-^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a12*a9*a11*a3\
-*a10*a1*a10*a14*a3*a14*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a\
-13*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a\
-10*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a\
-4*a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6\
-*a7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
-  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
-*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
-*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
-14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
-^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
-4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
-^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
-^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a12*a6*a7*a12\
-*a7*a4*a10*a11^2*a13*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13\
-*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10\
-*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*\
-a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a\
-7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
-  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
-*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
-*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
-14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
-^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
-4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
-^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
-^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a14*a11*a10*a\
-5*a3*a14*a5*a8*a2*a9*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13\
-*a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10\
-*a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*\
-a7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a\
-7*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
-  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
-*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
-*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
-14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
-^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
-4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
-^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
-^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a7*a9^2*a8*a14*a8*a\
-5*a9*a11*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13*a10*a14^2*a\
-2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10*a1*a4*a10*a\
-14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*a7*a4*a13*a5\
-*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a7*a2*a9*a10*\
-a9*a6*a14*a1*a10*a6*a11^2*a9*a8, 
-  a8^-1*a9^-1*a11^-2*a6^-1*a10^-1*a1^-1*a14^-1*a6^-1*a9^-1*a10^-1*a9^-1*a2^-1\
-*a7^-1*a6^-1*a2^-1*a6^-1*a12^-1*a2^-1*a13^-2*a7^-1*a3^-1*a10^-1*a12^-1*a14^-1\
-*a2^-1*a7^-1*a1^-1*a13^-1*a12^-1*a8^-1*a7^-1*a5^-1*a13^-1*a4^-1*a7^-1*a4^-1*a\
-14^-1*a1^-1*a3^-1*a8^-1*a10^-1*a13^-2*a4^-2*a12^-1*a9^-2*a3^-1*a5^-1*a2^-1*a8\
-^-1*a3^-1*a10^-1*a3^-1*a14^-1*a10^-1*a4^-1*a1^-1*a10^-1*a9^-1*a10^-1*a7^-1*a1\
-4^-1*a12^-1*a7^-1*a11^-1*a9^-1*a1^-1*a6^-1*a7^-1*a4^-1*a11^-1*a1^-1*a14^-1*a5\
-^-1*a6^-1*a9^-1*a2^-1*a14^-2*a10^-1*a13^-1*a14^-1*a2^-1*a1^-1*a10^-1*a9^-1*a8\
-^-1*a13^-1*a7^-1*a10^-1*a13^-1*a12^-1*a13^-1*a2^-1*a10^-1*a2^-1*a4*a8*a14*a3*\
-a12*a3*a6*a2*a4*a12*a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13*\
-a10*a14^2*a2*a9*a6*a5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10*\
-a1*a4*a10*a14*a3*a10*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*a\
-7*a4*a13*a5*a7*a8*a12*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a7\
-*a2*a9*a10*a9*a6*a14*a1*a10*a6*a11^2*a9*a8 ];
-r := a2*a10*a2*a13*a12*a13*a10*a7*a13*a8*a9*a10*a1*a2*a14*a13*a10*a14^2*a2*a9*a6*a\
-5*a14*a1*a11*a4*a7*a6*a1*a9*a11*a7*a12*a14*a7*a10*a9*a10*a1*a4*a10*a14*a3*a10\
-*a3*a8*a2*a5*a3*a9^2*a12*a4^2*a13^2*a10*a8*a3*a1*a14*a4*a7*a4*a13*a5*a7*a8*a1\
-2*a13*a1*a7*a2*a14*a12*a10*a3*a7*a13^2*a2*a12*a6*a2*a6*a7*a2*a9*a10*a9*a6*a14\
-*a1*a10*a6*a11^2*a9*a8;
-portraitRecovered := ConjugatorPortrait(G, gs, hs, 100, 2, true, 0.01, 0, 0);
-Print(portraitRecovered = AutomPortrait(r));
+G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)"); #Hanoi 3 Group
+AG_UseRewritingSystem(G);
+AG_UpdateRewritingSystem(G, 2);
+Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
+g_list := List([1..10], i -> Random(G));
+r := Product(List([1..10], i -> Random(G)));
+h_list := List(g_list, g -> r^-1*g*r);
+final := ConjugatorPortrait(G, g_list, h_list, 30, 2, false, 1, 3, 50); #r is probably not of length more than 20
+Print("r: ", r, "\n");
+Print("Portrait of r: ", AutomPortrait(r), "\n");
+Print("Portrait we found: ", final, "\n");
+Print("Correct? ", AutomPortrait(r) = final, "\n");

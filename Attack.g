@@ -178,28 +178,27 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	end;
 
 	FindAllConjugators := function(G, g, h)
-		local centralizer, r;
-
-		centralizer := Centralizer(G, g); # centralizer of g
-		r := RepresentativeAction(G, g, h, CONJUGATION_ACTION);
-		return Elements(RightCoset(centralizer, r));
+			local centralizer, r, c;
+			centralizer := Centralizer(G, g); # centralizer of g
+			r := RepresentativeAction(G, g, h, CONJUGATION_ACTION);
+	        return RightCoset(centralizer,r);
 	end;
-
+	
 	IntersectionOfConjugators := function(g_t, h_t)
-		local sigma_g, sigma_h, ghConjugators, allConj, i;
-
-		# getting tuples of g and h values
-		ghConjugators := FindAllConjugators(PermGroupOnLevel(G, 1), PermOnLevel(g_t[1], 1), PermOnLevel(h_t[1], 1));
-		i := 2;
-		while Length(ghConjugators) > 1 and i <= Length(g_t) do
-			# all conjugators of a g/h pair
-			sigma_g := PermOnLevel(g_t[i], 1);
-			sigma_h := PermOnLevel(h_t[i], 1);
-			allConj := FindAllConjugators(PermGroupOnLevel(G, 1), sigma_g, sigma_h);
-			ghConjugators := Intersection(ghConjugators, allConj);
-			i := i + 1;
-		od;
-		return ghConjugators;
+	    local sigma_g, sigma_h, ghConjugators, allConj, i;
+	
+	    # getting tuples of g and h values
+	    ghConjugators := FindAllConjugators(PermGroupOnLevel(G, 1), PermOnLevel(g_t[1], 1), PermOnLevel(h_t[1], 1));
+	    i := 2;
+	    while Size(ghConjugators) > 1 and i <= Length(g_t) do
+	        # all conjugators of a g/h pair
+	        sigma_g := PermOnLevel(g_t[i], 1);
+	        sigma_h := PermOnLevel(h_t[i], 1);
+	        allConj := FindAllConjugators(PermGroupOnLevel(G, 1), sigma_g, sigma_h);
+	        ghConjugators := Intersection(ghConjugators, allConj);
+	        i := i + 1;
+	    od;
+	    return Elements(ghConjugators);
 	end;
 
 	#Helper method to recover action of r on the first level. Takes one (g, h) pair and 

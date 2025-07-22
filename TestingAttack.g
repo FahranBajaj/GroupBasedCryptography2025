@@ -1,4 +1,4 @@
-LoadPackage("AutomGrp");
+LoadPackage("AutomGrp", false);
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 
@@ -234,8 +234,8 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 				return nucleus[i];
 			fi;
 		od;
-		Error("Did not reach element of the nucleus at contracting_depth");	
-		#return nucleus[1];
+		#Error("Did not reach element of the nucleus at contracting_depth");	
+		return nucleus[1];
 	end;
 
 	#given portrait with a bunch of placeholders, replace with nucleus elements
@@ -492,8 +492,13 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 						Append(new_h_list, [rhs]);
 					od;
 					if Length(new_g_list) = 0 then 
-						#Print("Next list is empty at level ", level, "\n");
-						return fail;
+						if section_index = Length(set_of_related_r_sections) then 
+							#could not recover any section in this set
+							#Print("Next list is empty at level ", level, "\n");
+							return fail;
+						else 
+							#try another section in this set
+							continue;
 					fi;
 					#Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
@@ -593,7 +598,7 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 		new_h_list := [];	
 		num_new_pairs := 50;
 		if g_length <= r_length then 
-			extended_word_length := Int(Ceil(Float(r_length/g_length))); 
+			extended_word_length := Int(Ceil(Float(r_length/g_length)));
 		else
 			extended_word_length := 2;
 		fi;
@@ -636,11 +641,16 @@ AttackWrapper := function(G, g_list, h_list, g_length, r_length, contracting_dep
 	fi;
 end;
 
+OnBreak := function () 
+    QuitGap(); 
+end;
+
 RandomElementList := function(len, group, list_size)
 	local element_list, generators, i, prod, j;
 
     element_list := [];
-    generators := GeneratorsOfGroup(group);
+    generators := ShallowCopy(GeneratorsOfGroup(G));
+	Append(generators, List(generators, g -> g^-1));
 
    	for i in [1..list_size] do
 		prod := One(group);
@@ -661,15 +671,15 @@ Read("./ContractingGroupsFound/GroupsToTestAttack.g");
 csvForResults := OutputTextFile("AttackResults.csv", true);
 incorrectResults := OutputTextFile("IncorrectResults.g", true);
 
-GROUP_REC := G_12_3_07_2; 
-GROUP_STRING := "G_12_3_07_2";
-G_LENGTHS := [10, 100];
-R_LENGTHS := [10, 100];
-LIST_SIZES := [10];
+GROUP_REC := G_3_3_09_1; 
+GROUP_STRING := "G_3_3_09_1";
+G_LENGTHS := [10, 100, 1000];
+R_LENGTHS := [10, 100, 1000];
+LIST_SIZES := [5, 10, 50];
 
 G := AutomatonGroup(GROUP_REC.automaton);
 nucleusSize := GROUP_REC.nucleusSize;
-
+Print("Group: ", GROU_STRING, "\n");
 for r_length in R_LENGTHS do
 	if not LookupDictionary(feasibilities, [GROUP_REC, r_length]) then	
 		continue;
@@ -681,39 +691,42 @@ for r_length in R_LENGTHS do
 			continue;
 		fi;
 		for list_size in LIST_SIZES do 
-			gs := RandomElementList(g_length, G, list_size);
-			r := RandomElement(r_length, G);
-			hs := List(gs, g -> g^r);
-			callsToRecoveringL1 := 0;
-			callsToTestConjugacy := 0;
-			functionResults := [];
-			wrapperCall := IO_CallWithTimeout(rec(hours := 1), AttackWrapper, G, gs, hs, g_length, r_length, contracting_depth, AutomPortrait(r));
-			dataRow := Concatenation(GROUP_STRING, ",", String(nucleusSize), ",", String(g_length), ",", String(r_length), ",", String(list_size), ",", String(contracting_depth), ",", String(contractingDepthTime));
-			if wrapperCall[1] = fail then 
-				#unexpected error (probbaly used too much memory?)
-				Print("Unexpected error!\n");
-				dataRow := Concatenation(dataRow, ",-3\n");
-			elif wrapperCall[1] then 
-				#didn't time out
-				callsToRecoveringL1 := wrapperCall[2][3];
-				callsToTestConjugacy := wrapperCall[2][4];
-				if wrapperCall[2][1] = fail then 
-					#failed
-					dataRow := Concatenation(dataRow, ",0,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(wrapperCall[2][2]), "\n");
-				elif wrapperCall[2][1] then 
-					#function output was correct
-					dataRow := Concatenation(dataRow, ",1,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(wrapperCall[2][2]), "\n");
+			for trial in [1..TRIALS] do 
+				gs := RandomElementList(g_length, G, list_size);
+				r := RandomElement(r_length, G);
+				hs := List(gs, g -> g^r);
+				callsToRecoveringL1 := 0;
+				callsToTestConjugacy := 0;
+				functionResults := [];
+				wrapperCall := IO_CallWithTimeout(rec(hours := 1), AttackWrapper, G, gs, hs, g_length, r_length, contracting_depth, AutomPortrait(r));
+				dataRow := Concatenation(GROUP_STRING, ",", String(nucleusSize), ",", String(g_length), ",", String(r_length), ",", String(list_size), ",", String(contracting_depth), ",", String(contractingDepthTime));
+				if wrapperCall[1] = fail then 
+					#unexpected error (probbaly used too much memory?)
+					Print("Unexpected error!\n");
+					dataRow := Concatenation(dataRow, ",-3\n");
+				elif wrapperCall[1] then 
+					#didn't time out
+					callsToRecoveringL1 := wrapperCall[2][3];
+					callsToTestConjugacy := wrapperCall[2][4];
+					if wrapperCall[2][1] = fail then 
+						#failed
+						dataRow := Concatenation(dataRow, ",0,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(wrapperCall[2][2]), "\n");
+					elif wrapperCall[2][1] then 
+						#function output was correct
+						dataRow := Concatenation(dataRow, ",1,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(wrapperCall[2][2]), "\n");
+					else 
+						#function returned an incorrect portrait
+						AppendTo("IncorrectResults.g", "rec(G := ", G, ", gs := ", gs, ", hs := ", hs, ", g_length := ", g_length, ", r_length := ", r_length, ", r := ", r, ", contracting_depth := ", contracting_depth, "), ");
+						dataRow := Concatenation(dataRow, ",-2,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(wrapperCall[2][2]), "\n");
+					fi;
 				else 
-					#function returned an incorrect portrait
-					AppendTo("IncorrectResults.g", "rec(G := ", G, ", gs := ", gs, ", hs := ", hs, ", g_length := ", g_length, ", r_length := ", r_length, ", r := ", r, ", contracting_depth := ", contracting_depth, "), ");
-					dataRow := Concatenation(dataRow, ",-2,", String(callsToRecoveringL1), ",", String(callsToTestConjugacy), ",", String(wrapperCall[2][2]), "\n");
+					#we timed out
+					Print("Timed out!\n");
+					dataRow := Concatenation(dataRow, ",-1\n");
 				fi;
-			else 
-				#we timed out
-				Print("Timed out!\n");
-				dataRow := Concatenation(dataRow, ",-1\n");
-			fi;
-			AppendTo("AttackResults.csv", dataRow);
+				AppendTo("AttackResults.csv", dataRow);
+			od;
+			
 		od;
 	od;
 od;

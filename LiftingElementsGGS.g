@@ -1,3 +1,4 @@
+LoadPackage("AutomGrp", false);
 new_GGS_gr := function(v)
     # v: defining vector. v[0] <> 1 and v[Length(v)] = 1.
     # Length(v) = degree - 1
@@ -55,17 +56,7 @@ new_GGS_gr := function(v)
     # new automaton group!
     currentGGS := AutomatonGroup(gen_details, gen_names);
     L := GeneratorsOfGroup(currentGGS);
-    Print(currentGGS, "\n");
-
     return Subgroup(currentGGS, [L[1],L[2]]); # so we don't use all the extra variables
-end;
-
-#Returns a random element of the subgroup over which a GGS group with defining vector v is branching
-RandomSubgroupElementGGS := function(G)
-    local g, num_repetitions,a,b;
-    g := Random(G);
-    num_repetitions := Random([-10..10]);
-    return g^-1 * (a^-1*b^-1*a*b)^(num_repetitions) * g;
 end;
 
 RandomWordInGenerators := function(len, num_generators)
@@ -78,7 +69,7 @@ end;
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 
 # SETUP HERE!
-v := [Random([1..3]),Random([0..3]),Random([0..3]),0];
+v := [1, 0];
 G := new_GGS_gr(v);
 
 d := Length(v) + 1;
@@ -199,4 +190,3 @@ RandomStabilizerGGS := function(level, degree, innerWordLength, conjugatorLength
     return product;
 end;
 
-Print(RandomStabilizerGGS(1,5,1,1));

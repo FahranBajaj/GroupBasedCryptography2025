@@ -190,7 +190,7 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 	nucleus := GroupNucleus(G);
 	placeholder := nucleus[1];
 	nucleus_distinct_level := 1;
-	while true do	
+	while true do
 		L := List(nucleus, x -> PermOnLevel(x, nucleus_distinct_level));
 		if NoRepeats(L) then
 			break;
@@ -499,6 +499,7 @@ ConjugatorPortrait := function (G, g_list, h_list, g_length, r_length, contracti
 						else 
 							#try another section in this set
 							continue;
+						fi;
 					fi;
 					#Print("On level ", level, ", making recursive call to level ", level + 1, "\n");
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
@@ -676,10 +677,11 @@ GROUP_STRING := "G_3_3_09_1";
 G_LENGTHS := [10, 100, 1000];
 R_LENGTHS := [10, 100, 1000];
 LIST_SIZES := [5, 10, 50];
+TRIALS := 10;
 
 G := AutomatonGroup(GROUP_REC.automaton);
 nucleusSize := GROUP_REC.nucleusSize;
-Print("Group: ", GROU_STRING, "\n");
+Print("Group: ", GROUP_STRING, "\n");
 for r_length in R_LENGTHS do
 	if not LookupDictionary(feasibilities, [GROUP_REC, r_length]) then	
 		continue;
@@ -691,6 +693,7 @@ for r_length in R_LENGTHS do
 			continue;
 		fi;
 		for list_size in LIST_SIZES do 
+			Print("g length: ", g_length, ", r length: ", r_length, ", list size: ", list_size, "\n");
 			for trial in [1..TRIALS] do 
 				gs := RandomElementList(g_length, G, list_size);
 				r := RandomElement(r_length, G);

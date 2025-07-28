@@ -571,6 +571,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 			sigma_r := recoveringL1(g_list, h_list);
 			if sigma_r = fail then 
+				Print("Failed to recover an action on level ", level, "\n");
 				return fail;
 			fi;
 
@@ -623,7 +624,13 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 						Append(new_h_list, [rhs]);
 					od;
 					if Length(new_g_list) = 0 then 
-						return fail;
+						if section_index = Length(set_of_related_r_sections) then 
+							#Print("Next list is empty at level ", level, "\n");
+							return fail;
+						else 
+							#try another section in this set
+							continue;
+						fi;
 					fi;
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + 1);
 					if portrait_of_r_i = fail then 
@@ -743,14 +750,14 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 end;
 
 #A simplified example
-G := AutomatonGroup("a23 = (a23, 1, 1)(2, 3), a13 = (1, a13, 1)(1, 3), a12 = (1, 1, a12)(1, 2)"); #Hanoi 3 Group
+G := AutomatonGroup("a1 = (a2, 1)(1,2), a2 = (a1, a1)"); 
 AG_UseRewritingSystem(G);
 AG_UpdateRewritingSystem(G, 2);
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
-g_list := List([1..10], i -> Random(G));
-r := Product(List([1..10], i -> Random(G)));
+g_list :=RandomElementList(10, 10, G, 10);
+r := RandomElement(10, G);
 h_list := List(g_list, g -> r^-1*g*r);
-final := ConjugatorPortrait(G, g_list, h_list, 30, 2, false, 1, 3, 50); #r is probably not of length more than 20
+final := ConjugatorPortrait(G, g_list, h_list, 10, 2, false, 1, 3, 50); #r is probably not of length more than 20
 Print("r: ", r, "\n");
 Print("Portrait of r: ", AutomPortrait(r), "\n");
 Print("Portrait we found: ", final, "\n");

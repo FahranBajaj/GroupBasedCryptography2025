@@ -44,9 +44,9 @@ RandomGGS := function(degree)
     return GGSGenerator(vector);
 end;
 
-for degree in [5, 11, 19] do 
-    for i in [1..3] do 
-        G := RandomGGS(degree);
-        Print(G, "\n\t", IsContracting(G), "\n\t", IsFinite(G), "\n\t", IsFiniteState(G), "\n\n");
-    od;
-od;
+# for degree in [5, 11, 19] do 
+#     for i in [1..3] do 
+#         G := RandomGGS(degree);
+#         Print(G, "\n\t", IsContracting(G), "\n\t", IsFinite(G), "\n\t", IsFiniteState(G), "\n\n");
+#     od;
+# od;

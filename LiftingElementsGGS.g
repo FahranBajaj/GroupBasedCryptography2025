@@ -1,11 +1,9 @@
-LoadPackage("AutomGrp");
-Reset(GlobalMersenneTwister, CurrentDateTimeString());
-
 new_GGS_gr := function(v)
     # v: defining vector. v[0] <> 1 and v[Length(v)] = 1.
     # Length(v) = degree - 1
 
-    local degree, gen_details, current_gen, i, placeholder, possible_gens, gen_names, currentGGS;
+    local degree, gen_details, current_gen, i, placeholder, possible_gens, currentGGS, gen_names, L;
+
 
     # degree of tree
     degree := Length(v) + 1;
@@ -46,7 +44,7 @@ new_GGS_gr := function(v)
         fi;
     od;
 
-    Append(current_gen, [2]);   # adding a at the end
+    Append(current_gen, [3]);   # adding b at the end
     Append(current_gen, [()]);
     
     gen_details := Concatenation(gen_details{[1,2]}, [current_gen], gen_details{[3..Length(gen_details)]});
@@ -56,107 +54,19 @@ new_GGS_gr := function(v)
 
     # new automaton group!
     currentGGS := AutomatonGroup(gen_details, gen_names);
+    L := GeneratorsOfGroup(currentGGS);
+    Print(currentGGS, "\n");
 
-    return Subgroup(currentGGS, [a,b]); # so we don't use all the extra variables
+    return Subgroup(currentGGS, [L[1],L[2]]); # so we don't use all the extra variables
 end;
 
 #Returns a random element of the subgroup over which a GGS group with defining vector v is branching
 RandomSubgroupElementGGS := function(G)
-    local ab_sg, g, num_repetitions;
+    local g, num_repetitions,a,b;
     g := Random(G);
     num_repetitions := Random([-10..10]);
     return g^-1 * (a^-1*b^-1*a*b)^(num_repetitions) * g;
 end;
-
-#Returns an element that stabilizes the nth level, given a method that generates
-#random elements of the subgroup over which G is branching
-RandomStabilizerNthLevel := function(level, RandomSubgroupElement, degree)
-    if level = 0 then 
-        return RandomSubgroupElement();
-    fi;
-
-    return TreeAutomorphism(List([1..degree], i -> RandomStabilizerNthLevel(level - 1, RandomSubgroupElement, degree)), ());
-end;
-
-RandomElementList := function(min_len, max_len, group, list_size)
- 
-    local i , j, relations, rule, rules, rules_product, rules_equivalence, 
-		generators, family, randomelt, successors, gen, len, rws, letter_rep, 
-		starters, element_list;
-
-    element_list := [];
-   
-    AG_UseRewritingSystem(group);
-    relations := FindGroupRelations(group,2);
-
-    relations := Filtered(relations, x -> (Length(Word(x)) <= 3) ); 
-
-    if not relations = [] then
-	    AG_AddRelators(group, relations);
-    fi;
-
-    rws        := AG_RewritingSystem(group);
-    generators := GeneratorsOfMonoid(Image(rws!.mhom));
- 
-    rules      := AG_RewritingSystemRules(group);
-    rules_product := [];
-    rules_equivalence := [];
-    family     := FamilyObj(Word(One(group)));
-
-    for rule in rules do
-	letter_rep := LetterRepAssocWord(rule[1]);
-	if Size(letter_rep) = 2 then
-		Add(rules_product, letter_rep);
-        elif Size(letter_rep) = 1 then
-		Add(rules_equivalence, [letter_rep[1], LetterRepAssocWord(rule[2])]);
-	fi;
-    od;
-
-    starters   := Set([1..Size(generators)]);
-    successors := List([1..Size(generators)], x -> Set([1..Size(generators)]) );
-   
-    # No generator can be followed by an element that will simplify the product 
-    for rule in rules_product do
-	RemoveSet(successors[rule[1]], rule[2]);
-    od;
-
-    # If two generators are equivalent, ignore one
-    for rule in rules_equivalence do
-	for i in [1..Size(successors)] do	
-		RemoveSet(successors[i], rule[1]);
-	od;
-	successors[rule[1]] := [];
-	RemoveSet(starters, rule[1]);
-    od;
-
-    for i in [1..list_size] do
-	    gen :=  Random(starters);
-	    randomelt := [gen];
-	 	len := Random([min_len..max_len]);
-
-	    for j in [2..len] do  
-		    gen := Random(successors[gen]);
-		    Add( randomelt, gen );
-	    od;
-
-	    # Changes from denoting generators/inverses as 1, 2, 3.. to 1, -1, 2, -2..
-	    randomelt := List( randomelt, x -> (-1)^(x + 1)*Ceil(Float(x/2)) );
-	    randomelt := List( randomelt, x -> Int(x) );
-
-	    randomelt := AssocWordByLetterRep(family, randomelt);
-	    randomelt := Representative(randomelt, One(group));
-
-	    Add(element_list, randomelt);
-    od;
-
-    return element_list;
-end;
-
-RandomElement := function(len, group)
-    return RandomElementList(len - 5, len + 5, group, 1)[1];
-end;
-
-Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 
 RandomWordInGenerators := function(len, num_generators)
     local choicesOfGenerators;
@@ -164,10 +74,12 @@ RandomWordInGenerators := function(len, num_generators)
     return choicesOfGenerators;
 end;
 
-v := [1,1,0,0];
-G := new_GGS_gr(v);
-
 #Self-replicating equations:
+Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
+
+# SETUP HERE!
+v := [Random([1..3]),Random([0..3]),Random([0..3]),0];
+G := new_GGS_gr(v);
 
 d := Length(v) + 1;
 power := v[1];
@@ -182,7 +94,8 @@ for j in [1..d] do
     power := v[1];
 od;
 
-# fixme
+# setting up lifting dictionary
+
 CONJUGATOR_LIFTING_DICTIONARY := NewDictionary(1, true);
 AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, 1, List([1..lift_power], i -> 2));
 b_lift := List([1..(d-1)], i -> 1);
@@ -203,7 +116,7 @@ ProductOfPieces := function(pieces)
     local product, piece, conjugatorWord, conjugator, generator, commutator;
     product := One(G);
     for piece in pieces do 
-		#piece = [generator, conjugator]
+        #piece = [generator, conjugator]
         conjugatorWord := piece[2];
         conjugator := One(G);
         for generator in conjugatorWord do
@@ -216,8 +129,8 @@ ProductOfPieces := function(pieces)
 
         product := product*conjugator^-1;
         commutator := piece[1];
-		if commutator = 1 then 
-			product := product * (a^-1*b^-1*a*b);
+        if commutator = 1 then 
+            product := product * (a^-1*b^-1*a*b);
         else
             product := product * (b^-1*a^-1*b*a);
         fi;
@@ -231,35 +144,36 @@ end;
 #All sections at nth level are identity except first one.
 
 #Lifting equations: 
-    # [b,b^a] = [a,b]^b * [b,a] = ([a,b],1,...,1)
-    # [b,b^a]^-1 = [a,b] * [b,a]^b = ([b,a],1,...,1)
+# [b,b^a] = [a,b]^b * [b,a] = ([a,b],1,...,1)
+# [b,b^a]^-1 = [a,b] * [b,a]^b = ([b,a],1,...,1)
 RandomStabilizerGGSMostlyId := function(level, innerWordLength, conjugatorLength)
-	local current_level, current_element, lifted_element, piece, newConjugator,
-		commutator;
-	current_level := 0;
-	#Represent an element of N by list of [generator, conjugator] factors
-	#Where each conjugator is a list of numbers representing generators
-	current_element := List([1..innerWordLength], i -> [Random([1..2]), RandomWordInGenerators(conjugatorLength, 3)]);
-	while current_level < level do 
-		lifted_element := [];
-		for piece in current_element do 
-			#piece = [generator, conjugator]
-			newConjugator := NextLevelConjugator(piece[2]);
-			commutator := piece[1];
+    local current_level, current_element, lifted_element, piece, newConjugator,
+        commutator;
+    current_level := 0;
+    #Represent an element of N by list of [generator, conjugator] factors
+    #Where each conjugator is a list of numbers representing generators
+    current_element := List([1..innerWordLength], i -> [Random([1..2]), RandomWordInGenerators(conjugatorLength, 2)]); # was cL,3
 
-			if commutator = 1 then 
-                Append(lifted_element, [[1, Concatenation([b], newConjugator)]]);
+    while current_level < level do 
+        lifted_element := [];
+        for piece in current_element do 
+            #piece = [generator, conjugator]
+            newConjugator := NextLevelConjugator(piece[2]);
+            commutator := piece[1];
+
+            if commutator = 1 then 
+                Append(lifted_element, [[1, Concatenation([2], newConjugator)]]);
                 Append(lifted_element, [[2, newConjugator]]);
-			else 
+            else 
                 Append(lifted_element, [[1, newConjugator]]);
-                Append(lifted_element, [[2, Concatenation([b], newConjugator)]]);
-			fi;
-		od;
-		
-		current_element := lifted_element;
-		current_level := current_level + 1;
-	od;
-	return ProductOfPieces(current_element);
+                Append(lifted_element, [[2, Concatenation([2], newConjugator)]]);
+            fi;
+        od;
+        
+        current_element := lifted_element;
+        current_level := current_level + 1;
+    od;
+    return ProductOfPieces(current_element);
 end;
 
 GroupActionOnLevel := function(level)
@@ -267,7 +181,7 @@ GroupActionOnLevel := function(level)
         return point^PermOnLevel(g, level);
     end;
 end;
- 
+
 ElemMappingAToBOnLevel := function(G, a, b, level)
     local action;
     action := GroupActionOnLevel(level);
@@ -276,7 +190,7 @@ end;
 
 RandomStabilizerGGS := function(level, degree, innerWordLength, conjugatorLength)
     local liftedSections, product, conjugator, i;
-    liftedSections := List([1..degree^level], i -> RandomStabilizerIMGZMostlyId(level, innerWordLength, conjugatorLength));
+    liftedSections := List([1..degree^level], i -> RandomStabilizerGGSMostlyId(level, innerWordLength, conjugatorLength));
     product := liftedSections[1];
     for i in [2..degree^level] do
         conjugator := ElemMappingAToBOnLevel(G, 1, i, level);
@@ -284,3 +198,5 @@ RandomStabilizerGGS := function(level, degree, innerWordLength, conjugatorLength
     od;
     return product;
 end;
+
+Print(RandomStabilizerGGS(1,5,1,1));

@@ -1,62 +1,39 @@
 LoadPackage("AutomGrp", false);
-new_GGS_gr := function(v)
-    # v: defining vector. v[0] <> 1 and v[Length(v)] = 1.
-    # Length(v) = degree - 1
 
-    local degree, gen_details, current_gen, i, placeholder, possible_gens, currentGGS, gen_names, L;
+RootAut := function(n)
 
+  return  Concatenation(List([1..n], x-> []), [PermListList([1..n],Concatenation([2..n],[1]))]) ;
 
-    # degree of tree
-    degree := Length(v) + 1;
+end;
 
-    gen_details := [];
+DirectedAutB := function(vector,j)
 
-    # adding 1
-    current_gen := List([1..degree], i -> 1);
-    Append(current_gen, [()]);
-    Append(gen_details, [current_gen]);
-    
-    # adding a
-    current_gen := List([1..degree], i -> 1);
-    Append(current_gen, [CycleFromList([1..degree])]);
-    Append(gen_details, [current_gen]);
+    local i , l ;
 
-    # now making all of the "bonus" generators (a to a power)
-    for i in v do 
-        if i <> 0 and i <> 1 then 
-            current_gen := List([1..degree], i -> 1);
-            Append(current_gen, [CycleFromList([1..degree])^i]);
-            Append(gen_details, [current_gen]);
-        fi;
-    od;
+    l := [] ; 
 
-    # making b
-    current_gen := [];
-    placeholder := 4;
+    for i in [1..Length(vector)]
+        do 
+            if vector[i] = 0 then 
 
-    for i in [1..Length(v)] do 
-        if v[i] = 0 then
-            Append(current_gen, [1]);
-        elif v[i] = 1 then 
-            Append(current_gen, [2]);
-        else
-            Append(current_gen, [placeholder]);
-            placeholder := placeholder + 1;
-        fi;
-    od;
+                l[i] := [] ;
 
-    Append(current_gen, [3]);   # adding b at the end
-    Append(current_gen, [()]);
-    
-    gen_details := Concatenation(gen_details{[1,2]}, [current_gen], gen_details{[3..Length(gen_details)]});
-    
-    possible_gens := ["1", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t"];
-    gen_names := List([1..Length(gen_details)], i -> possible_gens[i]);
+            else
 
-    # new automaton group!
-    currentGGS := AutomatonGroup(gen_details, gen_names);
-    L := GeneratorsOfGroup(currentGGS);
-    return Subgroup(currentGGS, [L[1],L[2]]); # so we don't use all the extra variables
+                l[i] := List([1..vector[i]],x->1) ;
+                l[Length(vector)+1] := [j] ;
+            fi;
+        od;
+
+    return Concatenation(l,[()]);
+
+end;
+
+# This function generates a GGS group with defining vector <vector> given as a list. 
+
+GGSGenerator := function(vector)
+
+    return SelfSimilarGroup([RootAut(Length(vector)+1), DirectedAutB(vector,2)],["a","b"]) ;
 end;
 
 RandomWordInGenerators := function(len, num_generators)
@@ -69,8 +46,8 @@ end;
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
 
 # SETUP HERE!
-v := [1, 0];
-G := new_GGS_gr(v);
+v := [6, 4, 3, 3, 6, 0];
+G := GGSGenerator(v);
 
 d := Length(v) + 1;
 power := v[1];
@@ -144,7 +121,6 @@ RandomStabilizerGGSMostlyId := function(level, innerWordLength, conjugatorLength
     #Represent an element of N by list of [generator, conjugator] factors
     #Where each conjugator is a list of numbers representing generators
     current_element := List([1..innerWordLength], i -> [Random([1..2]), RandomWordInGenerators(conjugatorLength, 2)]); # was cL,3
-
     while current_level < level do 
         lifted_element := [];
         for piece in current_element do 
@@ -153,11 +129,11 @@ RandomStabilizerGGSMostlyId := function(level, innerWordLength, conjugatorLength
             commutator := piece[1];
 
             if commutator = 1 then 
-                Append(lifted_element, [[1, Concatenation([2], newConjugator)]]);
+                Append(lifted_element, [[1, Concatenation(List([1..lift_power], i -> 2), newConjugator)]]);
                 Append(lifted_element, [[2, newConjugator]]);
             else 
                 Append(lifted_element, [[1, newConjugator]]);
-                Append(lifted_element, [[2, Concatenation([2], newConjugator)]]);
+                Append(lifted_element, [[2, Concatenation(List([1..lift_power], i -> 2), newConjugator)]]);
             fi;
         od;
         

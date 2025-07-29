@@ -1,4 +1,4 @@
-LoadPackage("AutomGrp");
+LoadPackage("AutomGrp", false);
 CONJUGATION_ACTION := OnPoints; # action is conjugation
 
 # Returns true if list L contains no repeat elements 
@@ -18,83 +18,25 @@ NoRepeats := function(L)
 	return no_repeats;
 end;
 
-#Slightly modified from 2024 group
-RandomElementList := function(min_len, max_len, group, list_size)
- 
-    local i , j, relations, rule, rules, rules_product, rules_equivalence, 
-		generators, family, randomelt, successors, gen, len, rws, letter_rep, 
-		starters, element_list;
+RandomElementList := function(len, group, list_size)
+	local element_list, generators, i, prod, j;
 
     element_list := [];
-   
-    AG_UseRewritingSystem(group);
-    relations := FindGroupRelations(group,2);
+    generators := ShallowCopy(GeneratorsOfGroup(group));
+	Append(generators, List(generators, g -> g^-1));
 
-    relations := Filtered(relations, x -> (Length(Word(x)) <= 3) ); 
-
-    if not relations = [] then
-	    AG_AddRelators(group, relations);
-    fi;
-
-    rws        := AG_RewritingSystem(group);
-    generators := GeneratorsOfMonoid(Image(rws!.mhom));
- 
-    rules      := AG_RewritingSystemRules(group);
-    rules_product := [];
-    rules_equivalence := [];
-    family     := FamilyObj(Word(One(group)));
-
-    for rule in rules do
-	letter_rep := LetterRepAssocWord(rule[1]);
-	if Size(letter_rep) = 2 then
-		Add(rules_product, letter_rep);
-        elif Size(letter_rep) = 1 then
-		Add(rules_equivalence, [letter_rep[1], LetterRepAssocWord(rule[2])]);
-	fi;
-    od;
-
-    starters   := Set([1..Size(generators)]);
-    successors := List([1..Size(generators)], x -> Set([1..Size(generators)]) );
-   
-    # No generator can be followed by an element that will simplify the product 
-    for rule in rules_product do
-	RemoveSet(successors[rule[1]], rule[2]);
-    od;
-
-    # If two generators are equivalent, ignore one
-    for rule in rules_equivalence do
-	for i in [1..Size(successors)] do
-		RemoveSet(successors[i], rule[1]);
+   	for i in [1..list_size] do
+		prod := One(group);
+		for j in [1..len] do
+			prod := prod * Random(generators);
+		od;
+		Append(element_list, [prod]);
 	od;
-	successors[rule[1]] := [];
-	RemoveSet(starters, rule[1]);
-    od;
-
-    for i in [1..list_size] do
-	    gen :=  Random(starters);
-	    randomelt := [gen];
-	 	len := Random([min_len..max_len]);
-
-	    for j in [2..len] do  
-		    gen := Random(successors[gen]);
-		    Add( randomelt, gen );
-	    od;
-
-	    # Changes from denoting generators/inverses as 1, 2, 3.. to 1, -1, 2, -2..
-	    randomelt := List( randomelt, x -> (-1)^(x + 1)*Ceil(Float(x/2)) );
-	    randomelt := List( randomelt, x -> Int(x) );
-
-	    randomelt := AssocWordByLetterRep(family, randomelt);
-	    randomelt := Representative(randomelt, One(group));
-
-	    Add(element_list, randomelt);
-    od;
-
-    return element_list;
+	return element_list;
 end;
 
 RandomElement := function(len, group)
-    return RandomElementList(len - 5, len + 5, group, 1)[1];
+    return RandomElementList(len, group, 1)[1];
 end;
 
 ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_approx, epsilon,
@@ -106,7 +48,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		recoveringL1, IntersectionOfConjugators, PermutationOfNestedPortrait, 
 		PortraitProduct, PortraitInverse, FindAllConjugators, AssignNucleusElements, 
 		PortraitToNucleusByPermutation, ElemsWithDistinctPerms, ElemWithPermutation,
-		PruneNLevels, PermActionAtVertex, BuildPortrait;
+		nucleus_one_down, PruneNLevels, PermActionAtVertex, BuildPortrait;
 
 	N_LETTERS := DegreeOfTree(G);
 
@@ -125,7 +67,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	ContractingDepthStatApprox := function(N, r_length)
 		local gs, cd_UB, elements, elem_depths, ed, x_bar, differences, variance, sigma, g;
 		# N: sample size of elements with same length l(g), sigma: standard deviation, x_bar sample mean, epsilon: small
-		gs := RandomElementList(r_length, r_length, G, N);
+		gs := RandomElementList(r_length, G, N);
 		N := N*1.0;
 
 		elem_depths := [];
@@ -302,28 +244,29 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 
 			#lines with hashtag at end are temporary to print something I'm interested in
 			#same with local variables numberTrivial, numberNontrivial, toReturn
-			numberTrivial := 0; #
-			numberNonTrivial := 0; #
-            firstAction := PermActionOnLevel(possibleRs[1], bigLevel, smallLevel, 2);
-			if PermActionOnLevel(possibleRs[1], bigLevel, 1, 2) = One(SymmetricGroup(2)) then #
-					numberTrivial := numberTrivial + 1; #
-				else #
-					numberNonTrivial := numberNonTrivial + 1; #
-				fi; #
+			#numberTrivial := 0; #
+			#numberNonTrivial := 0; #
+            firstAction := PermActionOnLevel(possibleRs[1], bigLevel, smallLevel, N_LETTERS);
+			#if PermActionOnLevel(possibleRs[1], bigLevel, 1, 2) = One(SymmetricGroup(2)) then #
+			#		numberTrivial := numberTrivial + 1; #
+			#	else #
+			#		numberNonTrivial := numberNonTrivial + 1; #
+			#	fi; #
 			i := 2;
 			toReturn := true; #
 			while i <= Length(possibleRs) do 
-				if PermActionOnLevel(possibleRs[i], bigLevel, 1, 2) = One(SymmetricGroup(2)) then #
-					numberTrivial := numberTrivial + 1; #
-				else #
-					numberNonTrivial := numberNonTrivial + 1; #
-				fi; #
-				if PermActionOnLevel(possibleRs[i], bigLevel, smallLevel, 2) <> firstAction then 
-					toReturn := false;
+				#if PermActionOnLevel(possibleRs[i], bigLevel, 1, 2) = One(SymmetricGroup(2)) then #
+				#	numberTrivial := numberTrivial + 1; #
+				#else #
+				#	numberNonTrivial := numberNonTrivial + 1; #
+				#fi; #
+				if PermActionOnLevel(possibleRs[i], bigLevel, smallLevel, N_LETTERS) <> firstAction then 
+					#toReturn := false;
+					return false;
 				fi; #
 				i := i + 1;
 			od;
-			Print("\t\tnumberTrivial: ", numberTrivial, ", numberNonTrivial: ", numberNonTrivial, "\n");
+			#Print("\t\tnumberTrivial: ", numberTrivial, ", numberNonTrivial: ", numberNonTrivial, "\n");
 			return toReturn;
         end;
 
@@ -342,10 +285,10 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
             if UniqueOnLevel(possibleRs, current_level, 1) then
                 for level in Reversed([2..current_level]) do 
 					if UniqueOnLevel(possibleRs, current_level, level) then 
-						return [level, PermActionOnLevel(possibleRs[1], current_level, level, 2)];
+						return [level, PermActionOnLevel(possibleRs[1], current_level, level, N_LETTERS)];
 					fi;
 				od;
-				return [1, PermActionOnLevel(possibleRs[1], current_level, 1, 2)];
+				return [1, PermActionOnLevel(possibleRs[1], current_level, 1, N_LETTERS)];
             fi;
             #Narrow down possibilities for sigma_r by looking at conjugacy relationships between sections
             i := 1;
@@ -366,10 +309,10 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
             if UniqueOnLevel(possibleRs, current_level, 1) then
                 for level in Reversed([2..current_level]) do 
 					if UniqueOnLevel(possibleRs, current_level, level) then 
-						return [level, PermActionOnLevel(possibleRs[1], current_level, level, 2)];
+						return [level, PermActionOnLevel(possibleRs[1], current_level, level, N_LETTERS)];
 					fi;
 				od;
-				return [1, PermActionOnLevel(possibleRs[1], current_level, 1, 2)];
+				return [1, PermActionOnLevel(possibleRs[1], current_level, 1, N_LETTERS)];
             fi;
         od;
         Print("Failed to recover action within several levels\n");
@@ -388,6 +331,29 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			nucleus_distinct_level := nucleus_distinct_level + 1;
 		fi;
 	od;
+
+	PermutationOfNestedPortrait := function(portrait, depth_of_portrait)
+		local i, perms, l;
+
+		if Length(portrait)=1 then 
+			return PermOnLevel(portrait[1], depth_of_portrait); 
+		fi;
+
+		if depth_of_portrait=1 then
+			return portrait[1];
+		fi;
+
+		perms:=List([1..N_LETTERS],x->PermutationOfNestedPortrait (portrait[x+1], depth_of_portrait-1));
+
+		l := [];
+
+		for i in [1..N_LETTERS] 
+			do
+				Append(l, List(ListPerm(perms[i],N_LETTERS^(depth_of_portrait-1)),x->x+N_LETTERS^(depth_of_portrait-1)*(i^portrait[1]-1)));
+			od;
+
+		return PermList(l);
+	end;
 
 	N_perms := List(nucleus, x -> PermOnLevel(x, nucleus_distinct_level));
 
@@ -418,25 +384,40 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	end;
 
 	#Modified from Arsalan
+	nucleus_one_down := List(nucleus , x -> [[x],Concatenation([PermOnLevel(x,1)] , List([1..N_LETTERS],y->[PortraitToNucleusByPermutation([Sections(x)[y]])])) ]) ;
 	PrunePortrait := function(portrait)
-		local nucleus, nucleus_identified, prune;
+		local IdentifyNucleusElement, prune, identified_nuc_elem;
 
-		nucleus := List(GroupNucleus(G), x-> [x]) ; 
-		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
+		IdentifyNucleusElement := function(p_int)
+			#Assumption: p_int is a portrait of depth greater than 0
+			local nucleus_elem, i;
+			for nucleus_elem in nucleus_one_down do 
+				if p_int[1] = nucleus_elem[2][1] then 
+					#permutations match
+					i := 2;
+					while i <= N_LETTERS + 1 and Length(p_int[i]) = 1 and Word(p_int[i][1]) = Word(nucleus_elem[2][i][1]) do 
+						i := i + 1;
+					od;
+					if i = N_LETTERS + 2 then 	
+						return nucleus_elem[1];
+					fi;
+				fi;
+			od;
+			return fail;
+		end;
 
 		prune := function(p) 
 			local p_int , i ; 
 			p_int := [] ;
-			if p in nucleus then 
-				return p ;
+			if Length(p) = 1 then 
+				return p;
 			else 
-				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1]))) ;
-				for i in [1..Length(nucleus_identified)] do 
-						if p_int = nucleus_identified[i][2] then
-							return nucleus_identified[i][1];
-						fi;
-					od;
-				return p_int ;
+				p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1])));
+				identified_nuc_elem := IdentifyNucleusElement(p_int);
+				if identified_nuc_elem <> fail then 
+					return identified_nuc_elem;
+				fi;
+				return p_int;
 			fi;
 		end;
 
@@ -444,28 +425,42 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	end;
 
 	PruneNLevels := function(portrait, n)
-		local nucleus, nucleus_identified, prune;
+		local IdentifyNucleusElement, prune, identified_nuc_elem;
 
-		nucleus := List(GroupNucleus(G), x-> [x]) ; 
-		nucleus_identified := List(nucleus , x -> [x,Concatenation([PermOnLevel(x[1],1)] , List([1..N_LETTERS],y->[Sections(x[1])[y]])) ]) ;
+		IdentifyNucleusElement := function(p_int)
+			#Assumption: p_int is a portrait of depth greater than 0
+			local nucleus_elem, i;
+			for nucleus_elem in nucleus_one_down do 
+				if p_int[1] = nucleus_elem[2][1] then 
+					#permutations match
+					i := 2;
+					while i <= N_LETTERS + 1 and Length(p_int[i]) = 1 and Word(p_int[i][1]) = Word(nucleus_elem[2][i][1]) do 
+						i := i + 1;
+					od;
+					if i = N_LETTERS + 2 then 	
+						return nucleus_elem[1];
+					fi;
+				fi;
+			od;
+			return fail;
+		end;
 
 		prune := function(p, n) 
 			local p_int , i ; 
 			p_int := [] ;
-			if p in nucleus then 
-				return p ;
+			if Length(p) = 1 then 
+				return p;
 			else 
 				if n > 1 then 
-					p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1], n-1)));
+					p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> prune(p[x+1], n - 1)));
 				else 
-					p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x-> p[x+1])) ;
+					p_int := Concatenation([p[1]] , List([1..N_LETTERS] , x -> p[x+1]));
 				fi;
-				for i in [1..Length(nucleus_identified)] do 
-						if p_int = nucleus_identified[i][2] then
-							return nucleus_identified[i][1];
-						fi;
-					od;
-				return p_int ;
+				identified_nuc_elem := IdentifyNucleusElement(p_int);
+				if identified_nuc_elem <> fail then 
+					return identified_nuc_elem;
+				fi;
+				return p_int;
 			fi;
 		end;
 
@@ -505,41 +500,44 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		return inverse(p) ;
 	end;
 
-	PermutationOfNestedPortrait := function(portrait, depth_of_portrait)
-		local i, perms, l;
-
-		if Length(portrait)=1 then 
-			return PermOnLevel(portrait[1], depth_of_portrait); 
-		fi;
-
-		if depth_of_portrait=1 then
-			return portrait[1];
-		fi;
-
-		perms:=List([1..N_LETTERS],x->PermutationOfNestedPortrait (portrait[x+1], depth_of_portrait-1));
-
-		l := [];
-
-		for i in [1..N_LETTERS] 
-			do
-				Append(l, List(ListPerm(perms[i],N_LETTERS^(depth_of_portrait-1)),x->x+N_LETTERS^(depth_of_portrait-1)*(i^portrait[1]-1)));
+	ElemsWithDistinctPerms := function(gs, hs, level)
+		local Argmin, permToElems, perms, i, perm, pairs_to_return, elemsWithPerm, argmin;
+		Argmin := function(list, func)
+			local argmin, min, i, newVal;
+			argmin := 1;
+			min := func(list[1]);
+			i := 2;
+			while i <= Length(list) do 
+				newVal := func(list[i]);
+				if newVal < min then 
+					min := newVal;
+					argmin := i;
+				fi;
+				i := i + 1;
 			od;
+			return argmin;
+		end;
 
-		return PermList(l);
-	end;
-
-	ElemsWithDistinctPerms := function(elems, recoveryLevel)
-		local perms_seen, indices_to_return, i, perm;
-		perms_seen := NewDictionary(PermOnLevel(elems[1], 1), false, SymmetricGroup(N_LETTERS^recoveryLevel));
-		indices_to_return := [];
-		for i in [1..Length(elems)] do	
-			perm := PermOnLevel(elems[i], recoveryLevel);
-			if not KnowsDictionary(perms_seen, perm) then 
-				AddDictionary(perms_seen, perm);
-				Append(indices_to_return, [i]);
+		permToElems := NewDictionary(PermOnLevel(gs[1], level), true, SymmetricGroup(N_LETTERS^level));
+		perms := [];
+		for i in [1..Length(gs)] do 
+			perm := PermOnLevel(gs[i], level);
+			if KnowsDictionary(permToElems, perm) then 
+				Append(LookupDictionary(permToElems, perm), [[gs[i], hs[i]]]);
+			else
+				AddDictionary(permToElems, perm, [[gs[i], hs[i]]]);
+				Append(perms, [perm]);
 			fi;
 		od;
-		return indices_to_return;
+
+		pairs_to_return := [];
+		for perm in perms do 
+			elemsWithPerm := LookupDictionary(permToElems, perm);
+			argmin := Argmin(elemsWithPerm, x -> Length(Word(x[1])));
+			Append(pairs_to_return, [elemsWithPerm[argmin]]);
+		od;
+		SortBy(pairs_to_return, x -> Length(Word(x[1])));
+		return pairs_to_return;
 	end;
 	
 	ElemWithPermutation := function(g_s, h_s, sigma)
@@ -559,28 +557,17 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 	end;
 
 	PermActionAtVertex := function(perm, bigLevel, vertex)
-		local topLevelAction, permSplitLeftRight, topLevelSwap, singleSubtreePerm, permAsList, i, nextVertex;
+		local topLevelAction, topLevelReset, permSplitBySection, permAsList,
+			singleSubtreePerm, nextVertex;
 
-		topLevelAction := PermActionOnLevel(perm, bigLevel, 1, 2);
+		topLevelAction := PermActionOnLevel(perm, bigLevel, 1, N_LETTERS);
 		if vertex = [] then 
 			return topLevelAction;
 		fi;
-		if topLevelAction = () then 
-			permSplitLeftRight := perm;
-		else 
-			topLevelSwap := PermList(Concatenation([2^(bigLevel - 1) + 1..2^bigLevel], [1..2^(bigLevel-1)]));
-			permSplitLeftRight := perm * topLevelSwap;
-		fi;
-		if vertex[1] = 1 then 
-			singleSubtreePerm := RestrictedPermNC(permSplitLeftRight, [1..2^(bigLevel - 1)]);
-		else 
-			permAsList := ListPerm(permSplitLeftRight, 2^(bigLevel));
-			for i in [1..2^(bigLevel - 1)] do 
-				Remove(permAsList, 1);
-			od;
-			singleSubtreePerm := PermList(List([1..2^(bigLevel - 1)], i -> permAsList[i] - 2^(bigLevel - 1)));
-		fi;
-
+		topLevelReset := PermList(Concatenation(List([1..N_LETTERS], i -> List([1..N_LETTERS^(bigLevel - 1)], j ->  j + (i^(topLevelAction^-1) - 1)*N_LETTERS^(bigLevel - 1)))));
+		permSplitBySection := perm * topLevelReset;
+		permAsList := ListPerm(permSplitBySection, N_LETTERS^(bigLevel));
+		singleSubtreePerm := PermList(List(permAsList{[(vertex[1] - 1)*N_LETTERS^(bigLevel - 1) + 1..vertex[1] * N_LETTERS^(bigLevel - 1)]}, i -> i - (vertex[1] - 1)*N_LETTERS^(bigLevel - 1)));
 		nextVertex := ShallowCopy(vertex);
 		Remove(nextVertex, 1);
 		return PermActionAtVertex(singleSubtreePerm, bigLevel - 1, nextVertex);
@@ -607,7 +594,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 		
 			local recoveredAction, sigma_r, recoveryLevel, sigma_gs, related_r_sections, 
 				onlyPruneNew, elems_with_distinct_perms, set_of_related_r_sections, i, 
-				new_g_list, new_h_list, g_h_index, sigma_g, sections_of_r, 
+				new_g_list, new_h_list, g_h_index, g_h_pair, sigma_g, sections_of_r, 
 				lhs, g, h, next, rhs, portrait_of_r_i, cycle_member, number_recovered, 
 				h_index, new_section, new_r_sections, newer_r_sections, r_i_permutation, 
 				r_i_sections, r_i, index, sigma_h, orbits_under_sigma_gs, 
@@ -651,7 +638,7 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 			fi;
 
 			#Recover as many sections as needed and fill in the rest
-			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list, recoveryLevel);
+			elems_with_distinct_perms := ElemsWithDistinctPerms(g_list, h_list, recoveryLevel);
 			sections_of_r := [];
 			for set_of_related_r_sections in related_r_sections do 
 				for section_index in [1..Length(set_of_related_r_sections)] do 
@@ -662,9 +649,6 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 					new_h_list := [];
 					for g_h_index in [1..Size(g_list)] do 
 						g := g_list[g_h_index];
-						if IsOne(g) then
-							continue;
-						fi;
 						sigma_g := PermOnLevel(g, recoveryLevel);
 						h := h_list[g_h_index];
 						#if (a_1, ..., a_n) is a cycle in sigma_g and b_i = sigma_r(a_i) then
@@ -677,11 +661,22 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 							rhs := rhs*Sections(h, recoveryLevel)[next^sigma_r];
 							next := next^sigma_g;
 						od;
+						#easy way to avoid adding identities to list
+						if Length(Word(lhs)) = 0 then 
+							continue;
+						fi;
 						Append(new_g_list, [lhs]);
 						Append(new_h_list, [rhs]);
 					od;
 					if Length(new_g_list) = 0 then	
-						return fail;
+						if section_index = Length(set_of_related_r_sections) then 
+							#could not recover any section in this set
+							Print("Next list is empty at level ", level, "\n");
+							return fail;
+						else 
+							#try another section in this set
+							continue;
+						fi;
 					fi;
                     Print("On level ", level, ", making recursive call to level ", level + recoveryLevel, ", section ", i, "\n");
 					portrait_of_r_i := ConjugatorPortraitRecursive(new_g_list, new_h_list, level + recoveryLevel);
@@ -704,10 +699,10 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 					number_recovered := 1;
 					while number_recovered < Length(set_of_related_r_sections) do
 						for index in new_r_sections do 
-							for g_h_index in elems_with_distinct_perms do 
-								g := g_list[g_h_index];
+							for g_h_pair in elems_with_distinct_perms do 
+								g := g_h_pair[1];
 								sigma_g := PermOnLevel(g, recoveryLevel);
-								h := h_list[g_h_index];
+								h := g_h_pair[2];
 								sigma_h := PermOnLevel(h, recoveryLevel);
 								cycle_member := index^sigma_g;
 								h_index := index^sigma_r;
@@ -716,8 +711,6 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 									new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Sections(g, recoveryLevel)[index])), sections_of_r[index]), AutomPortrait(Sections(h, recoveryLevel)[h_index]));
 									if onlyPruneNew then 
 										new_section := AssignNucleusElements(new_section, current_portrait_depth);
-									fi;
-									if onlyPruneNew then 
 										new_section := PrunePortrait(new_section);
 									fi;
 								else 
@@ -738,8 +731,6 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 										new_section := PortraitProduct(PortraitProduct(PortraitInverse(AutomPortrait(Sections(g, recoveryLevel)[cycle_member])), new_section), AutomPortrait(Sections(h, recoveryLevel)[h_index]));
 										if onlyPruneNew then 
 											new_section := AssignNucleusElements(new_section, current_portrait_depth);
-										fi;
-										if onlyPruneNew then 
 											new_section := PrunePortrait(new_section);
 										fi;
 									else 
@@ -807,7 +798,68 @@ ConjugatorPortrait := function (G, g_list, h_list, r_length, k, use_statistical_
 end;
 
 Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
-G := AutomatonGroup("a = (1, 1)(1, 2), b = (a, c), c = (b, 1)");
+
+new_GGS_gr := function(v)
+    # v: defining vector. v[0] <> 1 and v[Length(v)] = 1.
+    # Length(v) = degree - 1
+
+    local degree, gen_details, current_gen, i, placeholder, possible_gens, currentGGS, gen_names, L;
+
+
+    # degree of tree
+    degree := Length(v) + 1;
+
+    gen_details := [];
+
+    # adding 1
+    current_gen := List([1..degree], i -> 1);
+    Append(current_gen, [()]);
+    Append(gen_details, [current_gen]);
+    
+    # adding a
+    current_gen := List([1..degree], i -> 1);
+    Append(current_gen, [CycleFromList([1..degree])]);
+    Append(gen_details, [current_gen]);
+
+    # now making all of the "bonus" generators (a to a power)
+    for i in v do 
+        if i <> 0 and i <> 1 then 
+            current_gen := List([1..degree], i -> 1);
+            Append(current_gen, [CycleFromList([1..degree])^i]);
+            Append(gen_details, [current_gen]);
+        fi;
+    od;
+
+    # making b
+    current_gen := [];
+    placeholder := 4;
+
+    for i in [1..Length(v)] do 
+        if v[i] = 0 then
+            Append(current_gen, [1]);
+        elif v[i] = 1 then 
+            Append(current_gen, [2]);
+        else
+            Append(current_gen, [placeholder]);
+            placeholder := placeholder + 1;
+        fi;
+    od;
+
+    Append(current_gen, [3]);   # adding b at the end
+    Append(current_gen, [()]);
+    
+    gen_details := Concatenation(gen_details{[1,2]}, [current_gen], gen_details{[3..Length(gen_details)]});
+    
+    possible_gens := ["1", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t"];
+    gen_names := List([1..Length(gen_details)], i -> possible_gens[i]);
+
+    # new automaton group!
+    currentGGS := AutomatonGroup(gen_details, gen_names);
+    return currentGGS;
+end;
+
+v := [3, 5, 1, 3, 4, 0];
+G := new_GGS_gr(v);
 
 RandomWordInGenerators := function(len, num_generators)
     local choicesOfGenerators;
@@ -815,10 +867,26 @@ RandomWordInGenerators := function(len, num_generators)
     return choicesOfGenerators;
 end;
 
+d := Length(v) + 1;
+power := v[1];
+for j in [1..d] do
+    power := power * j;
+    
+    if power mod d = 1 then 
+        lift_power := j;
+        break;
+    fi;
+
+    power := v[1];
+od;
+
+# setting up lifting dictionary
+
 CONJUGATOR_LIFTING_DICTIONARY := NewDictionary(1, true);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, 1, [2]);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, 2, [3]);
-AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, 3, [1, 2, 1]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, 1, List([1..lift_power], i -> 2));
+b_lift := List([1..(d-1)], i -> 1);
+Append(b_lift, [2,1]);
+AddDictionary(CONJUGATOR_LIFTING_DICTIONARY, 2, b_lift);
 
 NextLevelConjugator := function(wordOfElement)
     local newGeneratorIndices, i;
@@ -834,56 +902,64 @@ ProductOfPieces := function(pieces)
     local product, piece, conjugatorWord, conjugator, generator, commutator;
     product := One(G);
     for piece in pieces do 
-		#piece = [generator, conjugator]
+        #piece = [generator, conjugator]
         conjugatorWord := piece[2];
         conjugator := One(G);
         for generator in conjugatorWord do
             if generator = 1 then 
                 conjugator := conjugator * a;
-            elif generator = 2 then 
-                conjugator := conjugator * b;
             else
-                conjugator := conjugator * c;
+                conjugator := conjugator * b;
             fi;
         od;
+
         product := product*conjugator^-1;
         commutator := piece[1];
-		if commutator = 1 then 
-			product := product * (a*b)^2;
-		else 
-			product := product * (b*c)^2;
-		fi;
+        if commutator = 1 then 
+            product := product * (a^-1*b^-1*a*b);
+        else
+            product := product * (b^-1*a^-1*b*a);
+        fi;
+
         product := product * conjugator;
     od;
     return product;
 end;
 
-RandomStabilizerIMGZMostlyId := function(level, innerWordLength, conjugatorLength)
-	local current_level, current_element, lifted_element, piece, newConjugator,
-		commutator;
-	current_level := 0;
-	#Represent an element of N by list of [generator, conjugator] factors
-	#Where each conjugator is a list of numbers representing generators
-	current_element := List([1..innerWordLength], i -> [Random([1..2]), RandomWordInGenerators(conjugatorLength, 3)]);
-	while current_level < level do 
-		lifted_element := [];
-		for piece in current_element do 
-			#piece = [generator, conjugator]
-			newConjugator := NextLevelConjugator(piece[2]);
-			commutator := piece[1];
-			if commutator = 1 then 
-            	Append(lifted_element, [[2, newConjugator]]);
-			else 
-				Append(lifted_element, [[1, Concatenation([1, 2, 3], newConjugator)]]);
-				Append(lifted_element, [[2, Concatenation([2], newConjugator)]]);
-				Append(lifted_element, [[1, Concatenation([1], newConjugator)]]);
-			fi;
-		od;
-		
-		current_element := lifted_element;
-		current_level := current_level + 1;
-	od;
-	return ProductOfPieces(current_element);
+#Computes random stabilizers of the nth level for the GGS group with vector v. 
+#All sections at nth level are identity except first one.
+
+#Lifting equations: 
+# [b,b^a] = [a,b]^b * [b,a] = ([a,b],1,...,1)
+# [b,b^a]^-1 = [a,b] * [b,a]^b = ([b,a],1,...,1)
+RandomStabilizerGGSMostlyId := function(level, innerWordLength, conjugatorLength)
+    local current_level, current_element, lifted_element, piece, newConjugator,
+        commutator;
+    current_level := 0;
+    #Represent an element of N by list of [generator, conjugator] factors
+    #Where each conjugator is a list of numbers representing generators
+    current_element := List([1..innerWordLength], i -> [Random([1..2]), RandomWordInGenerators(conjugatorLength, 2)]); # was cL,3
+
+    while current_level < level do 
+        lifted_element := [];
+        for piece in current_element do 
+            #piece = [generator, conjugator]
+            newConjugator := NextLevelConjugator(piece[2]);
+            commutator := piece[1];
+
+            if commutator = 1 then 
+                Append(lifted_element, [[1, Concatenation([2], newConjugator)]]);
+                Append(lifted_element, [[2, newConjugator]]);
+            else 
+                Append(lifted_element, [[1, newConjugator]]);
+                Append(lifted_element, [[2, Concatenation([2], newConjugator)]]);
+            fi;
+        od;
+        
+        current_element := lifted_element;
+        current_level := current_level + 1;
+    od;
+    return ProductOfPieces(current_element);
 end;
 
 GroupActionOnLevel := function(level)
@@ -891,33 +967,33 @@ GroupActionOnLevel := function(level)
         return point^PermOnLevel(g, level);
     end;
 end;
- 
+
 ElemMappingAToBOnLevel := function(G, a, b, level)
     local action;
     action := GroupActionOnLevel(level);
     return RepresentativeAction(G, a, b, action);
 end;
 
-RandomStabilizerIMGZ := function(level, innerWordLength, conjugatorLength)
+RandomStabilizerGGS := function(level, degree, innerWordLength, conjugatorLength)
     local liftedSections, product, conjugator, i;
-    liftedSections := List([1..2^level], i -> RandomStabilizerIMGZMostlyId(level, innerWordLength, conjugatorLength));
+    liftedSections := List([1..degree^level], i -> RandomStabilizerGGSMostlyId(level, innerWordLength, conjugatorLength));
     product := liftedSections[1];
-    for i in [2..2^level] do
+    for i in [2..degree^level] do
         conjugator := ElemMappingAToBOnLevel(G, 1, i, level);
         product := product * liftedSections[i]^conjugator;
     od;
     return product;
 end;
 
-g_list := List([1..30], i -> RandomStabilizerIMGZ(4, 10, 10));
+g_list := List([1..30], i -> RandomStabilizerGGS(3, 7, 1, 1));
 R_LEN := 1000;
 Print("gs chosen\n");
 r := RandomElement(R_LEN, G);
 Print("r chosen\n");
 h_list := List(g_list, g -> r^-1*g*r);
 Print("hs calculated\n");
-final := ConjugatorPortrait(G, g_list, h_list, R_LEN, 2, false, 0.1, 0, 0, 5); #r is probably not of length more than 20
-Print("r: ", r, "\n");
-Print("Portrait of r: ", AutomPortrait(r), "\n");
-Print("Portrait we found: ", final, "\n");
+final := ConjugatorPortrait(G, g_list, h_list, R_LEN, 2, true, 0.1, 0, 0, 4); 
+#Print("r: ", r, "\n");
+#Print("Portrait of r: ", AutomPortrait(r), "\n");
+#Print("Portrait we found: ", final, "\n");
 Print("Correct? ", AutomPortrait(r) = final, "\n");

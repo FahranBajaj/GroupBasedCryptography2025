@@ -2,9 +2,45 @@ LoadPackage("AutomGrp");
 Reset(GlobalMersenneTwister, CurrentDateTimeString());
 
 GGS_stabilizing_element := function(timer, v, inner_word_lens, conj_lens)
-    local new_GGS_gr, RandomSubgroupElementGGS, RandomWordInGenerators, G, d, power, j, CONJUGATOR_LIFTING_DICTIONARY, 
+    local RootAut, DirectedAutB, GGSGenerator, new_GGS_gr, RandomSubgroupElementGGS, RandomWordInGenerators, G, d, power, j, CONJUGATOR_LIFTING_DICTIONARY, 
     NextLevelConjugator, ProductOfPieces, RandomStabilizerGGSMostlyId, RandomStabilizerGGSMostlyId_WORDLEN, GroupActionOnLevel, 
     ElemMappingAToBOnLevel, RandomStabilizerGGS, f_name, f, word_info, lift_power, b_lift, v_str, c, i, timer_call, totalTime;
+
+    RootAut := function(n)
+
+        return  Concatenation(List([1..n], x-> []), [PermListList([1..n],Concatenation([2..n],[1]))]) ;
+
+    end;
+
+    DirectedAutB := function(vector,j)
+
+        local i , l ;
+
+        l := [] ; 
+
+        for i in [1..Length(vector)]
+            do 
+                if vector[i] = 0 then 
+
+                    l[i] := [] ;
+
+                else
+
+                    l[i] := List([1..vector[i]],x->1) ;
+                    l[Length(vector)+1] := [j] ;
+                fi;
+            od;
+
+        return Concatenation(l,[()]);
+
+    end;
+
+    # This function generates a GGS group with defining vector <vector> given as a list. 
+
+    GGSGenerator := function(vector)
+
+        return SelfSimilarGroup([RootAut(Length(vector)+1), DirectedAutB(vector,2)],["a","b"]) ;
+    end;
 
     new_GGS_gr := function(v)
         # v: defining vector. v[0] <> 1 and v[Length(v)] = 1.
@@ -84,8 +120,14 @@ GGS_stabilizing_element := function(timer, v, inner_word_lens, conj_lens)
 
     #Self-replicating equations:
     Reset(GlobalMersenneTwister,CurrentDateTimeString()); #new random seed
-    # v := [Random([1..3]),Random([0..3]),Random([0..3]),0];
-    G := new_GGS_gr(v);
+
+    # ********************************************************************************
+    # ********************************************************************************
+    # ********************************************************************************
+    # ********************************************************************************
+
+    G := GGSGenerator(v);
+    Print(v, "\n");
 
     d := Length(v) + 1;
     power := v[1];
@@ -167,16 +209,16 @@ GGS_stabilizing_element := function(timer, v, inner_word_lens, conj_lens)
 
             lifted_element := [];
             for piece in word do 
-                #piece = [generator, conjugator]
+                ##piece = [generator, conjugator]
                 newConjugator := NextLevelConjugator(piece[2]);
                 commutator := piece[1];
 
                 if commutator = 1 then 
-                    Append(lifted_element, [[1, Concatenation([2], newConjugator)]]);
+                    Append(lifted_element, [[1, Concatenation(List([1..lift_power], i -> 2), newConjugator)]]);
                     Append(lifted_element, [[2, newConjugator]]);
-                else
+                else 
                     Append(lifted_element, [[1, newConjugator]]);
-                    Append(lifted_element, [[2, Concatenation([2], newConjugator)]]);
+                    Append(lifted_element, [[2, Concatenation(List([1..lift_power], i -> 2), newConjugator)]]);
                 fi;
             od;
             
@@ -246,7 +288,7 @@ GGS_stabilizing_element := function(timer, v, inner_word_lens, conj_lens)
         return product;
     end;
 
-    f_name := "lifting_word_length.csv";
+    f_name := "lifting_word_length_RETEST.csv";
     f := OutputTextFile(f_name, true);
     # save a list of each level and corresponding word length
     # then append the list to a file, with col 3 being level 0
@@ -317,18 +359,19 @@ end;
     # inner word length: [1,3,5]
     # outer word length: [1,3,5]
 
-
-DEGREE := 3; # will be 3/11/19
+DEGREE := 5;
 
 DEFINING_VECTOR := List([1..(DEGREE-1)], i -> Random([0..(DEGREE-1)]));
 DEFINING_VECTOR[1] := Random([1..(DEGREE-1)]);
 DEFINING_VECTOR[Length(DEFINING_VECTOR)] := 0;
 
-NUM_TRIALS := 10;
-TIME_LIMIT := 600.0;
+NUM_TRIALS := 2; # should be 10;
+TIME_LIMIT := 2.0; # should be 600.0;
+
+# pass in [1,3,5], [1,3,5]
 
 # random vector from 0 to p-1 for each
 
 for i in [1..NUM_TRIALS] do 
-    Print(GGS_stabilizing_element(TIME_LIMIT, DEFINING_VECTOR, [1,3,5],[1,3,5])); #FIXME: should be TIME_LIMIT
+    Print(GGS_stabilizing_element(TIME_LIMIT, DEFINING_VECTOR, [1,3,5],[1,3,5]));
 od;

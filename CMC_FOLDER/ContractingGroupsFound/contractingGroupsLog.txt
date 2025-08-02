@@ -1,0 +1,211 @@
+For degree 3, with 3 generators and p = 0.9, 100 out of 100 groups were contracting, of which 
+79 were found to be finite and 20 were found to be infinite.
+
+For degree 3, with 7 generators and p = 0.9, 100 out of 100 groups were contracting, of which 
+76 were found to be finite and 23 were found to be infinite.
+
+For degree 7, with 3 generators and p = 0.9, 100 out of 100 groups were contracting, of which 
+41 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 3 generators and p = 0.9, 94 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 7 generators and p = 0.9, 93 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 7 generators and p = 0.9, 93 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 10 generators and p = 0.9, 93 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 3 generators and p = 0.9, 92 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 10 generators and p = 0.9, 99 out of 100 groups were contracting, of which 
+6 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 7 generators and p = 0.9, 98 out of 100 groups were contracting, of which 
+15 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 10 generators and p = 0.9, 90 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 3, with 3 generators and p = 0.7, 90 out of 100 groups were contracting, of which 
+20 were found to be finite and 38 were found to be infinite.
+
+For degree 3, with 7 generators and p = 0.7, 91 out of 100 groups were contracting, of which 
+36 were found to be finite and 3 were found to be infinite.
+
+For degree 3, with 10 generators and p = 0.7, 85 out of 100 groups were contracting, of which 
+11 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 3 generators and p = 0.7, 74 out of 100 groups were contracting, of which 
+1 were found to be finite and 53 were found to be infinite.
+
+For degree 12, with 3 generators and p = 0.7, 61 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 3 generators and p = 0.7, 62 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 10 generators and p = 0.7, 63 out of 100 groups were contracting, of which 
+0 were found to be finite and 22 were found to be infinite.
+
+For degree 7, with 7 generators and p = 0.7, 53 out of 100 groups were contracting, of which 
+0 were found to be finite and 23 were found to be infinite.
+
+For degree 12, with 7 generators and p = 0.7, 45 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 10 generators and p = 0.7, 28 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 3, with 3 generators and p = 0.3, 17 out of 100 groups were contracting, of which 
+2 were found to be finite and 12 were found to be infinite.
+
+For degree 20, with 7 generators and p = 0.7, 1 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 10 generators and p = 0.7, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 3 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 7 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 10 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 3 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 7 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 10 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 3 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 3, with 7 generators and p = 0.3, 4 out of 100 groups were contracting, of which 
+0 were found to be finite and 2 were found to be infinite.
+
+For degree 3, with 10 generators and p = 0.3, 6 out of 100 groups were contracting, of which 
+0 were found to be finite and 2 were found to be infinite.
+
+For degree 7, with 7 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 10 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+#--------------------Part 2--------------------
+For degree 3, with 3 generators and p = 0.3, 17 out of 100 groups were contracting, of which 
+2 were found to be finite and 12 were found to be infinite.
+
+For degree 3, with 3 generators and p = 0.7, 90 out of 100 groups were contracting, of which 
+20 were found to be finite and 40 were found to be infinite.
+
+For degree 3, with 3 generators and p = 0.9, 100 out of 100 groups were contracting, of which 
+79 were found to be finite and 20 were found to be infinite.
+
+For degree 3, with 7 generators and p = 0.3, 4 out of 100 groups were contracting, of which 
+0 were found to be finite and 2 were found to be infinite.
+
+For degree 3, with 7 generators and p = 0.7, 91 out of 100 groups were contracting, of which 
+36 were found to be finite and 3 were found to be infinite.
+
+For degree 3, with 7 generators and p = 0.9, 100 out of 100 groups were contracting, of which 
+76 were found to be finite and 23 were found to be infinite.
+
+For degree 3, with 10 generators and p = 0.3, 6 out of 100 groups were contracting, of which 
+0 were found to be finite and 2 were found to be infinite.
+
+For degree 3, with 10 generators and p = 0.7, 85 out of 100 groups were contracting, of which 
+11 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 3 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 3 generators and p = 0.7, 74 out of 100 groups were contracting, of which 
+1 were found to be finite and 53 were found to be infinite.
+
+For degree 7, with 3 generators and p = 0.9, 100 out of 100 groups were contracting, of which 
+41 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 7 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 7 generators and p = 0.7, 53 out of 100 groups were contracting, of which 
+0 were found to be finite and 23 were found to be infinite.
+
+For degree 7, with 7 generators and p = 0.9, 98 out of 100 groups were contracting, of which 
+15 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 10 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 7, with 10 generators and p = 0.7, 63 out of 100 groups were contracting, of which 
+0 were found to be finite and 22 were found to be infinite.
+
+For degree 7, with 10 generators and p = 0.9, 99 out of 100 groups were contracting, of which 
+6 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 3 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 3 generators and p = 0.7, 61 out of 100 groups were contracting, of which 
+0 were found to be finite and 59 were found to be infinite.
+
+For degree 12, with 3 generators and p = 0.9, 92 out of 100 groups were contracting, of which 
+0 were found to be finite and 42 were found to be infinite.
+
+For degree 12, with 7 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 7 generators and p = 0.7, 45 out of 100 groups were contracting, of which 
+0 were found to be finite and 41 were found to be infinite.
+
+For degree 12, with 7 generators and p = 0.9, 93 out of 100 groups were contracting, of which 
+0 were found to be finite and 3 were found to be infinite.
+
+For degree 12, with 10 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 12, with 10 generators and p = 0.7, 28 out of 100 groups were contracting, of which 
+0 were found to be finite and 20 were found to be infinite.
+
+For degree 12, with 10 generators and p = 0.9, 93 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 3 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 3 generators and p = 0.7, 62 out of 100 groups were contracting, of which 
+0 were found to be finite and 62 were found to be infinite.
+
+For degree 20, with 3 generators and p = 0.9, 94 out of 100 groups were contracting, of which 
+0 were found to be finite and 70 were found to be infinite.
+
+For degree 20, with 7 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 7 generators and p = 0.7, 1 out of 100 groups were contracting, of which 
+0 were found to be finite and 1 were found to be infinite.
+
+For degree 20, with 7 generators and p = 0.9, 93 out of 100 groups were contracting, of which 
+0 were found to be finite and 37 were found to be infinite.
+
+For degree 20, with 10 generators and p = 0.3, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 10 generators and p = 0.7, 0 out of 100 groups were contracting, of which 
+0 were found to be finite and 0 were found to be infinite.
+
+For degree 20, with 10 generators and p = 0.9, 90 out of 100 groups were contracting, of which 
+0 were found to be finite and 22 were found to be infinite.
+
